@@ -35,23 +35,17 @@ export class AnalyzeService {
   async analyze(request: AnalyzeRequestDto): Promise<AnalyzeResponseDto> {
     const startTime = Date.now();
 
-    this.logger.debug('Analyzing content', {
-      parentID: request.parentID,
-      customerID: request.customerID,
-      senderID: request.senderID,
-      messageID: request.messageID,
-      contentLength: request.content.length,
-    });
+    this.logger.debug(
+      `Analyzing content - messageID: ${request.messageID}, contentLength: ${request.content.length}`,
+    );
 
     // Check cache
     const cachedResult = await this.cacheService.get<AnalysisDto>(request.content);
     if (cachedResult) {
       const processingTime = Date.now() - startTime;
-      this.logger.log('Returning cached analysis result', {
-        messageID: request.messageID,
-        language: cachedResult.language,
-        processingTime,
-      });
+      this.logger.log(
+        `Returning cached analysis result - messageID: ${request.messageID}, language: ${cachedResult.language}, processingTime: ${processingTime}ms`,
+      );
 
       return this.buildResponse(cachedResult, true, processingTime);
     }
@@ -71,13 +65,9 @@ export class AnalyzeService {
     await this.cacheService.set(request.content, analysis, this.CACHE_TTL);
 
     const processingTime = Date.now() - startTime;
-    this.logger.log('Analysis completed', {
-      messageID: request.messageID,
-      language: analysis.language,
-      confidence: analysis.lang_certainity,
-      cached: false,
-      processingTime,
-    });
+    this.logger.log(
+      `Analysis completed - messageID: ${request.messageID}, language: ${analysis.language}, confidence: ${analysis.lang_certainity}, cached: false, processingTime: ${processingTime}ms`,
+    );
 
     return this.buildResponse(analysis, false, processingTime);
   }
