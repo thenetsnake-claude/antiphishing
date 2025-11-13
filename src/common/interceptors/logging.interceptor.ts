@@ -52,6 +52,7 @@ export class LoggingInterceptor implements NestInterceptor {
           statusCode: error.status || 500,
           processingTime,
           error: error.message,
+          validationErrors: error.response?.message || null,
         });
         throw error;
       }),
