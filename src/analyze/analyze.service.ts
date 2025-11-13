@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import LinkifyIt from 'linkify-it';
-import tlds from 'tlds';
+import LinkifyIt = require('linkify-it');
+import tlds = require('tlds');
 import { CacheService } from '../cache/cache.service';
 import { LanguageService } from '../language/language.service';
 import { AnalyzeRequestDto } from './dto/analyze-request.dto';
