@@ -3,6 +3,11 @@ import { AnalyzeController } from '../analyze.controller';
 import { AnalyzeService } from '../analyze.service';
 import { AnalyzeRequestDto } from '../dto/analyze-request.dto';
 
+// Mock franc module
+jest.mock('franc', () => ({
+  francAll: jest.fn(),
+}));
+
 describe('AnalyzeController', () => {
   let controller: AnalyzeController;
   let service: AnalyzeService;
