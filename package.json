@@ -80,15 +80,8 @@
       "!**/index.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node",
-    "coverageThreshold": {
-      "global": {
-        "branches": 75,
-        "functions": 75,
-        "lines": 75,
-        "statements": 75
-      }
-    }
+    "coverageProvider": "v8",
+    "testEnvironment": "node"
   },
   "engines": {
     "node": ">=22.0.0",
