@@ -251,6 +251,33 @@ run_test "URL detection - no URLs" 200 '{
   "messageID": "523e4567-e89b-12d3-a456-426614174002"
 }' '"urls":\[\]'
 
+# Test 18: URL detection - bare domain
+run_test "URL detection - bare domain" 200 '{
+  "parentID": "623e4567-e89b-12d3-a456-426614174000",
+  "customerID": "723e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Visit example.com for more information",
+  "messageID": "823e4567-e89b-12d3-a456-426614174002"
+}' '"urls":\["http://example.com"\]'
+
+# Test 19: URL detection - multiple bare domains
+run_test "URL detection - multiple bare domains" 200 '{
+  "parentID": "923e4567-e89b-12d3-a456-426614174000",
+  "customerID": "a23e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Check example.com, test.org, and demo.net",
+  "messageID": "b23e4567-e89b-12d3-a456-426614174002"
+}' '"urls":\['
+
+# Test 20: URL detection - email should not be detected
+run_test "URL detection - email not detected" 200 '{
+  "parentID": "c23e4567-e89b-12d3-a456-426614174000",
+  "customerID": "d23e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Contact support@example.com for help",
+  "messageID": "e23e4567-e89b-12d3-a456-426614174002"
+}' '"urls":\[\]'
+
 # Test Health Endpoints
 print_test "Test $((TESTS_RUN + 1)): Health check endpoint"
 ((TESTS_RUN++))

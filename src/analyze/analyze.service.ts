@@ -109,28 +109,49 @@ export class AnalyzeService {
   }
 
   /**
-   * Extract URLs from content using regex pattern
-   * Detects http://, https://, and www. URLs
+   * Extract URLs from content using regex patterns
+   * Detects http://, https://, www., and bare domain URLs
    */
   private extractUrls(content: string): string[] {
-    // Comprehensive URL regex pattern
-    const urlPattern = /(?:https?:\/\/|www\.)[^\s<>"{}|\\^`\[\]]+/gi;
-    const matches = content.match(urlPattern);
+    const urls: string[] = [];
 
-    if (!matches) {
-      return [];
+    // Pattern 1: URLs with protocol (http://, https://)
+    const protocolPattern = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+    const protocolMatches = content.match(protocolPattern);
+    if (protocolMatches) {
+      urls.push(
+        ...protocolMatches.map(url => url.replace(/[.,;!?:'")\]]+$/, '')),
+      );
     }
 
-    // Clean and deduplicate URLs
-    const urls = matches.map(url => {
-      // Add protocol if missing (for www. URLs)
-      if (url.startsWith('www.')) {
-        return `http://${url}`;
-      }
-      return url;
-    });
+    // Pattern 2: URLs starting with www.
+    const wwwPattern = /www\.[^\s<>"{}|\\^`\[\]]+/gi;
+    const wwwMatches = content.match(wwwPattern);
+    if (wwwMatches) {
+      urls.push(
+        ...wwwMatches.map(url => `http://${url.replace(/[.,;!?:'")\]]+$/, '')}`),
+      );
+    }
 
-    // Remove duplicates
+    // Pattern 3: Bare domains (e.g., example.com, test.org)
+    // Match domain.tld with common TLDs, but not in email addresses
+    const bareDomainPattern = /(?<![/@])(?:^|\s)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:com|org|net|edu|gov|mil|co|io|dev|app|tech|info|biz|name|pro|museum|aero|asia|cat|coop|jobs|mobi|tel|travel|xxx|uk|us|ca|au|de|fr|it|nl|es|ru|jp|cn|in|br|mx|za|se|no|fi|dk|be|ch|at|nz|sg|hk|kr|tw|my|ph|th|vn|id|ar|cl|co\.uk|co\.za|com\.au|com\.br)(?:\s|$|[^\w.-])/gi;
+    const bareDomainMatches = content.match(bareDomainPattern);
+    if (bareDomainMatches) {
+      const cleanedDomains = bareDomainMatches
+        .map(match => match.trim())
+        // Remove trailing punctuation (commas, periods, etc.)
+        .map(match => match.replace(/[.,;!?:'")\]]+$/, ''))
+        .filter(domain => {
+          // Exclude if it's part of an email address
+          const emailCheck = new RegExp(`\\S+@${domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+          return !emailCheck.test(content);
+        })
+        .map(domain => `http://${domain}`);
+      urls.push(...cleanedDomains);
+    }
+
+    // Remove duplicates and return
     return [...new Set(urls)];
   }
 

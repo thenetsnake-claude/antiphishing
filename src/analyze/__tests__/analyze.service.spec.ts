@@ -330,12 +330,12 @@ describe('AnalyzeService', () => {
       expect(result.analysis.enhanced.urls).toHaveLength(0);
     });
 
-    it('should handle content with only domain names (no protocol)', async () => {
-      const request = createMockRequest('Contact us at example.com');
+    it('should detect bare domains without protocol', async () => {
+      const request = createMockRequest('Visit example.com for more info');
       const result = await service.analyze(request);
 
-      // Should not match domain without protocol prefix
-      expect(result.analysis.enhanced.urls).toHaveLength(0);
+      expect(result.analysis.enhanced.urls).toContain('http://example.com');
+      expect(result.analysis.enhanced.urls).toHaveLength(1);
     });
 
     it('should extract URLs with ports', async () => {
@@ -354,6 +354,73 @@ describe('AnalyzeService', () => {
         'https://example.com/file-name_v2.0.pdf',
       );
       expect(result.analysis.enhanced.urls).toHaveLength(1);
+    });
+
+    it('should detect multiple bare domains', async () => {
+      const request = createMockRequest('Visit example.com and test.org for info');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain('http://example.com');
+      expect(result.analysis.enhanced.urls).toContain('http://test.org');
+      expect(result.analysis.enhanced.urls).toHaveLength(2);
+    });
+
+    it('should detect subdomains', async () => {
+      const request = createMockRequest('Check subdomain.example.com');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain('http://subdomain.example.com');
+      expect(result.analysis.enhanced.urls).toHaveLength(1);
+    });
+
+    it('should detect various TLDs', async () => {
+      const request = createMockRequest('Visit example.io, test.dev, and demo.app');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain('http://example.io');
+      expect(result.analysis.enhanced.urls).toContain('http://test.dev');
+      expect(result.analysis.enhanced.urls).toContain('http://demo.app');
+      expect(result.analysis.enhanced.urls).toHaveLength(3);
+    });
+
+    it('should not detect email addresses as URLs', async () => {
+      const request = createMockRequest('Contact us at info@example.com');
+      const result = await service.analyze(request);
+
+      // Should not extract the domain from email address
+      expect(result.analysis.enhanced.urls).toEqual([]);
+    });
+
+    it('should detect domains but not emails in same content', async () => {
+      const request = createMockRequest(
+        'Visit example.com or email info@test.org for details',
+      );
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain('http://example.com');
+      expect(result.analysis.enhanced.urls).toHaveLength(1);
+      // test.org should not be detected as it's part of an email
+    });
+
+    it('should handle mixed protocol and bare domains', async () => {
+      const request = createMockRequest(
+        'Visit https://secure.com, example.org, and www.test.net',
+      );
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain('https://secure.com');
+      expect(result.analysis.enhanced.urls).toContain('http://example.org');
+      expect(result.analysis.enhanced.urls).toContain('http://www.test.net');
+      expect(result.analysis.enhanced.urls).toHaveLength(3);
+    });
+
+    it('should detect country code TLDs', async () => {
+      const request = createMockRequest('Visit example.co.uk and test.com.au');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain('http://example.co.uk');
+      expect(result.analysis.enhanced.urls).toContain('http://test.com.au');
+      expect(result.analysis.enhanced.urls).toHaveLength(2);
     });
   });
 });

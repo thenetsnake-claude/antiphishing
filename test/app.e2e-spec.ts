@@ -227,6 +227,65 @@ describe('Antiphishing API (e2e)', () => {
             expect(res.body.analysis.enhanced.urls).toContain('https://example.com');
           });
       });
+
+      it('should detect bare domains without protocol', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit example.com for more information',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toContain('http://example.com');
+            expect(res.body.analysis.enhanced.urls).toHaveLength(1);
+          });
+      });
+
+      it('should detect multiple bare domains', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit example.com, test.org, and demo.net today',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toHaveLength(3);
+            expect(res.body.analysis.enhanced.urls).toContain('http://example.com');
+            expect(res.body.analysis.enhanced.urls).toContain('http://test.org');
+            expect(res.body.analysis.enhanced.urls).toContain('http://demo.net');
+          });
+      });
+
+      it('should not detect email addresses as URLs', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Contact us at support@example.com for help',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toEqual([]);
+          });
+      });
+
+      it('should handle mixed protocol and bare domains', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit https://secure.com, example.org, and www.test.net',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toHaveLength(3);
+            expect(res.body.analysis.enhanced.urls).toContain('https://secure.com');
+            expect(res.body.analysis.enhanced.urls).toContain('http://example.org');
+            expect(res.body.analysis.enhanced.urls).toContain('http://www.test.net');
+          });
+      });
     });
 
     describe('Validation', () => {

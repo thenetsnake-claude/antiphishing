@@ -121,18 +121,27 @@ The API automatically extracts URLs from the message content and includes them i
 - URLs starting with `http://` (e.g., `http://example.com`)
 - URLs starting with `https://` (e.g., `https://secure.example.com`)
 - URLs starting with `www.` (automatically prefixed with `http://`, e.g., `www.example.com` → `http://www.example.com`)
+- **Bare domains** (e.g., `example.com`, `test.org`, `demo.io`) - automatically prefixed with `http://`
 
 **URL extraction features:**
 - Detects URLs with paths, query parameters, and fragments
+- Supports 50+ TLDs including: .com, .org, .net, .edu, .gov, .io, .dev, .app, .tech, .co.uk, .com.au, and more
+- Handles subdomains (e.g., `subdomain.example.com`)
+- Removes trailing punctuation (commas, periods, etc.)
 - Deduplicates identical URLs
+- **Does not** detect domains in email addresses (e.g., `user@example.com`)
 - Returns empty array `[]` when no URLs are present
-- Domain names without protocol prefixes (e.g., `example.com`) are **not** detected
 
-**Example:**
+**Examples:**
 
 Content: `"Visit https://example.com or www.test.org for more info"`
-
 Result: `"urls": ["https://example.com", "http://www.test.org"]`
+
+Content: `"Check example.com, test.org, and demo.net today"`
+Result: `"urls": ["http://example.com", "http://test.org", "http://demo.net"]`
+
+Content: `"Contact support@example.com for help"`
+Result: `"urls": []` (email addresses are not detected as URLs)
 
 **Error Response (400 Bad Request):**
 ```json
