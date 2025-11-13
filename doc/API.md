@@ -125,9 +125,10 @@ The API automatically extracts URLs from the message content and includes them i
 
 **URL extraction features:**
 - Detects URLs with paths, query parameters, and fragments
-- Supports 50+ TLDs including: .com, .org, .net, .edu, .gov, .io, .dev, .app, .tech, .co.uk, .com.au, and more
+- **Supports ALL TLDs (1500+)** including: .com, .org, .net, .edu, .gov, .io, .dev, .app, .tech, .xyz, .cloud, .online, .shop, .museum, .aero, .travel, .co.uk, .com.au, and many more
+- Powered by `linkify-it` library with comprehensive TLD database that is regularly updated
 - Handles subdomains (e.g., `subdomain.example.com`)
-- Removes trailing punctuation (commas, periods, etc.)
+- Automatically removes trailing punctuation (commas, periods, etc.)
 - Deduplicates identical URLs
 - **Does not** detect domains in email addresses (e.g., `user@example.com`)
 - Returns empty array `[]` when no URLs are present

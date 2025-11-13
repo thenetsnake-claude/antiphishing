@@ -5,7 +5,7 @@ NestJS-based content analysis API with language detection and Redis caching.
 ## Features
 
 - **Language Detection**: Automatic language detection using franc library
-- **URL Extraction**: Detects and extracts URLs (http://, https://, www., bare domains) from message content
+- **URL Extraction**: Detects and extracts URLs (http://, https://, www., bare domains) with support for ALL TLDs (1500+)
 - **Redis Caching**: High-performance caching with Sentinel support
 - **Health Checks**: Kubernetes-ready health, readiness, and liveness probes
 - **Structured Logging**: JSON logging with daily rotation

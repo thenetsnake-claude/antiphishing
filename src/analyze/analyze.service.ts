@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import LinkifyIt from 'linkify-it';
+import tlds from 'tlds';
 import { CacheService } from '../cache/cache.service';
 import { LanguageService } from '../language/language.service';
 import { AnalyzeRequestDto } from './dto/analyze-request.dto';
@@ -12,11 +14,17 @@ import { AnalyzeResponseDto, AnalysisDto, EnhancedAnalysisDto } from './dto/anal
 export class AnalyzeService {
   private readonly logger = new Logger(AnalyzeService.name);
   private readonly CACHE_TTL = 60; // 60 seconds
+  private readonly linkify: LinkifyIt;
 
   constructor(
     private readonly cacheService: CacheService,
     private readonly languageService: LanguageService,
-  ) {}
+  ) {
+    // Initialize linkify-it with all TLDs and fuzzy matching for domains without protocol
+    this.linkify = new LinkifyIt();
+    this.linkify.tlds(tlds); // Add all known TLDs (1500+)
+    this.linkify.set({ fuzzyLink: true, fuzzyEmail: false });
+  }
 
   /**
    * Analyze content and return analysis results
@@ -109,47 +117,29 @@ export class AnalyzeService {
   }
 
   /**
-   * Extract URLs from content using regex patterns
-   * Detects http://, https://, www., and bare domain URLs
+   * Extract URLs from content using linkify-it library
+   * Supports all TLDs and properly handles URLs with/without protocols
    */
   private extractUrls(content: string): string[] {
-    const urls: string[] = [];
+    // Use linkify-it to find all URLs (supports all TLDs automatically)
+    const matches = this.linkify.match(content);
 
-    // Pattern 1: URLs with protocol (http://, https://)
-    const protocolPattern = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
-    const protocolMatches = content.match(protocolPattern);
-    if (protocolMatches) {
-      urls.push(
-        ...protocolMatches.map(url => url.replace(/[.,;!?:'")\]]+$/, '')),
-      );
+    if (!matches) {
+      return [];
     }
 
-    // Pattern 2: URLs starting with www.
-    const wwwPattern = /www\.[^\s<>"{}|\\^`\[\]]+/gi;
-    const wwwMatches = content.match(wwwPattern);
-    if (wwwMatches) {
-      urls.push(
-        ...wwwMatches.map(url => `http://${url.replace(/[.,;!?:'")\]]+$/, '')}`),
-      );
-    }
+    // Extract and normalize URLs
+    const urls = matches
+      .map(match => {
+        let url = match.url;
 
-    // Pattern 3: Bare domains (e.g., example.com, test.org)
-    // Match domain.tld with common TLDs, but not in email addresses
-    const bareDomainPattern = /(?<![/@])(?:^|\s)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:com|org|net|edu|gov|mil|co|io|dev|app|tech|info|biz|name|pro|museum|aero|asia|cat|coop|jobs|mobi|tel|travel|xxx|uk|us|ca|au|de|fr|it|nl|es|ru|jp|cn|in|br|mx|za|se|no|fi|dk|be|ch|at|nz|sg|hk|kr|tw|my|ph|th|vn|id|ar|cl|co\.uk|co\.za|com\.au|com\.br)(?:\s|$|[^\w.-])/gi;
-    const bareDomainMatches = content.match(bareDomainPattern);
-    if (bareDomainMatches) {
-      const cleanedDomains = bareDomainMatches
-        .map(match => match.trim())
-        // Remove trailing punctuation (commas, periods, etc.)
-        .map(match => match.replace(/[.,;!?:'")\]]+$/, ''))
-        .filter(domain => {
-          // Exclude if it's part of an email address
-          const emailCheck = new RegExp(`\\S+@${domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
-          return !emailCheck.test(content);
-        })
-        .map(domain => `http://${domain}`);
-      urls.push(...cleanedDomains);
-    }
+        // Ensure protocol is present
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          url = `http://${url}`;
+        }
+
+        return url;
+      });
 
     // Remove duplicates and return
     return [...new Set(urls)];

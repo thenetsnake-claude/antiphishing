@@ -422,5 +422,30 @@ describe('AnalyzeService', () => {
       expect(result.analysis.enhanced.urls).toContain('http://test.com.au');
       expect(result.analysis.enhanced.urls).toHaveLength(2);
     });
+
+    it('should detect rare and new TLDs', async () => {
+      const request = createMockRequest(
+        'Check example.xyz, test.cloud, demo.online, and site.shop',
+      );
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain('http://example.xyz');
+      expect(result.analysis.enhanced.urls).toContain('http://test.cloud');
+      expect(result.analysis.enhanced.urls).toContain('http://demo.online');
+      expect(result.analysis.enhanced.urls).toContain('http://site.shop');
+      expect(result.analysis.enhanced.urls).toHaveLength(4);
+    });
+
+    it('should detect all types of TLDs including generic and sponsored', async () => {
+      const request = createMockRequest(
+        'Visit example.museum, test.aero, and demo.travel today',
+      );
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain('http://example.museum');
+      expect(result.analysis.enhanced.urls).toContain('http://test.aero');
+      expect(result.analysis.enhanced.urls).toContain('http://demo.travel');
+      expect(result.analysis.enhanced.urls).toHaveLength(3);
+    });
   });
 });
