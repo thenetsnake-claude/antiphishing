@@ -50,7 +50,7 @@ export class AnalyzeService {
     const languageResult = this.languageService.detect(request.content);
 
     // Build analysis result
-    const analysis = this.buildAnalysis(languageResult, false, Date.now() - startTime);
+    const analysis = this.buildAnalysis(languageResult, false, Date.now() - startTime, request.content);
 
     // Cache the analysis result
     await this.cacheService.set(request.content, analysis, this.CACHE_TTL);
@@ -74,6 +74,7 @@ export class AnalyzeService {
     languageResult: { language: string; confidence: number },
     cached: boolean,
     processingTime: number,
+    content: string,
   ): AnalysisDto {
     return {
       language: languageResult.language,
@@ -82,14 +83,14 @@ export class AnalyzeService {
       processing_time_ms: processingTime,
       risk_level: 0,
       triggers: [],
-      enhanced: this.buildEnhancedAnalysis(),
+      enhanced: this.buildEnhancedAnalysis(content),
     };
   }
 
   /**
-   * Build enhanced analysis with placeholder values
+   * Build enhanced analysis with URL detection
    */
-  private buildEnhancedAnalysis(): EnhancedAnalysisDto {
+  private buildEnhancedAnalysis(content: string): EnhancedAnalysisDto {
     return {
       keyword_density: 0,
       message_length_risk: 0,
@@ -102,9 +103,35 @@ export class AnalyzeService {
       total_temporal_risk: 0,
       suspicious_tld: '',
       phishing_keywords: [],
-      urls: [],
+      urls: this.extractUrls(content),
       phones: [],
     };
+  }
+
+  /**
+   * Extract URLs from content using regex pattern
+   * Detects http://, https://, and www. URLs
+   */
+  private extractUrls(content: string): string[] {
+    // Comprehensive URL regex pattern
+    const urlPattern = /(?:https?:\/\/|www\.)[^\s<>"{}|\\^`\[\]]+/gi;
+    const matches = content.match(urlPattern);
+
+    if (!matches) {
+      return [];
+    }
+
+    // Clean and deduplicate URLs
+    const urls = matches.map(url => {
+      // Add protocol if missing (for www. URLs)
+      if (url.startsWith('www.')) {
+        return `http://${url}`;
+      }
+      return url;
+    });
+
+    // Remove duplicates
+    return [...new Set(urls)];
   }
 
   /**

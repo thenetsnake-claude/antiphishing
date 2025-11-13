@@ -11,7 +11,7 @@ The Antiphishing API provides content analysis capabilities with language detect
 
 ### POST /analyze
 
-Analyzes message content and detects its language.
+Analyzes message content, detects its language, and extracts URLs.
 
 #### Request
 
@@ -80,7 +80,7 @@ Content-Type: application/json
       "total_temporal_risk": 0,
       "suspicious_tld": "",
       "phishing_keywords": [],
-      "urls": [],
+      "urls": ["http://example.com", "https://secure.site.com"],
       "phones": []
     }
   }
@@ -102,7 +102,8 @@ Content-Type: application/json
 | analysis.processing_time_ms | number | Processing time in milliseconds |
 | analysis.risk_level | number | Risk level (always 0 currently) |
 | analysis.triggers | array | Risk triggers (always empty currently) |
-| analysis.enhanced | object | Enhanced analysis metrics (all 0/empty currently) |
+| analysis.enhanced | object | Enhanced analysis metrics |
+| analysis.enhanced.urls | array | Extracted URLs from content (http://, https://, www.) |
 
 **Language Codes:**
 - `eng` - English
@@ -111,6 +112,27 @@ Content-Type: application/json
 - `pol` - Polish
 - `spa` - Spanish
 - `unknown` - Could not detect or low confidence
+
+**URL Detection:**
+
+The API automatically extracts URLs from the message content and includes them in the `analysis.enhanced.urls` array.
+
+**Detected URL formats:**
+- URLs starting with `http://` (e.g., `http://example.com`)
+- URLs starting with `https://` (e.g., `https://secure.example.com`)
+- URLs starting with `www.` (automatically prefixed with `http://`, e.g., `www.example.com` → `http://www.example.com`)
+
+**URL extraction features:**
+- Detects URLs with paths, query parameters, and fragments
+- Deduplicates identical URLs
+- Returns empty array `[]` when no URLs are present
+- Domain names without protocol prefixes (e.g., `example.com`) are **not** detected
+
+**Example:**
+
+Content: `"Visit https://example.com or www.test.org for more info"`
+
+Result: `"urls": ["https://example.com", "http://www.test.org"]`
 
 **Error Response (400 Bad Request):**
 ```json

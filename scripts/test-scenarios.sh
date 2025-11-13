@@ -206,6 +206,51 @@ run_test "Invalid request - empty senderID" 400 '{
   "messageID": "c23e4567-e89b-12d3-a456-426614174002"
 }' '"statusCode":400'
 
+# Test 13: URL detection - http URL
+run_test "URL detection - http URL" 200 '{
+  "parentID": "d23e4567-e89b-12d3-a456-426614174000",
+  "customerID": "d23e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Visit http://example.com for more information",
+  "messageID": "d23e4567-e89b-12d3-a456-426614174002"
+}' '"urls":\["http://example.com"\]'
+
+# Test 14: URL detection - https URL
+run_test "URL detection - https URL" 200 '{
+  "parentID": "e23e4567-e89b-12d3-a456-426614174000",
+  "customerID": "e23e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Secure site at https://secure.example.com",
+  "messageID": "e23e4567-e89b-12d3-a456-426614174002"
+}' '"urls":\["https://secure.example.com"\]'
+
+# Test 15: URL detection - www URL
+run_test "URL detection - www URL" 200 '{
+  "parentID": "f23e4567-e89b-12d3-a456-426614174000",
+  "customerID": "f23e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Check out www.example.org today",
+  "messageID": "f23e4567-e89b-12d3-a456-426614174002"
+}' '"urls":\["http://www.example.org"\]'
+
+# Test 16: URL detection - multiple URLs
+run_test "URL detection - multiple URLs" 200 '{
+  "parentID": "023e4567-e89b-12d3-a456-426614174000",
+  "customerID": "123e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Visit https://example.com or http://test.org and www.sample.net",
+  "messageID": "223e4567-e89b-12d3-a456-426614174002"
+}' '"urls":\['
+
+# Test 17: URL detection - no URLs
+run_test "URL detection - no URLs" 200 '{
+  "parentID": "323e4567-e89b-12d3-a456-426614174000",
+  "customerID": "423e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "This is a message without any URLs",
+  "messageID": "523e4567-e89b-12d3-a456-426614174002"
+}' '"urls":\[\]'
+
 # Test Health Endpoints
 print_test "Test $((TESTS_RUN + 1)): Health check endpoint"
 ((TESTS_RUN++))
