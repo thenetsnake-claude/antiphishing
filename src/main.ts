@@ -16,10 +16,10 @@ async function bootstrap() {
 
   // Get config service
   const configService = app.get(ConfigService);
-  const nodeEnv = configService.get<string>('nodeEnv');
-  const port = configService.get<number>('port');
-  const logLevel = configService.get<string>('logging.level');
-  const logFilePath = configService.get<string>('logging.filePath');
+  const nodeEnv = configService.get<string>('nodeEnv') || 'development';
+  const port = configService.get<number>('port') || 3000;
+  const logLevel = configService.get<string>('logging.level') || 'info';
+  const logFilePath = configService.get<string>('logging.filePath') || './logs';
 
   // Create and set Winston logger
   const winstonLogger = createWinstonLogger(nodeEnv, logLevel, logFilePath);

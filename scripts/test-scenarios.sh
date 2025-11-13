@@ -3,7 +3,8 @@
 # Antiphishing API Test Scenarios
 # This script tests various scenarios using cURL
 
-set -e
+# Don't exit on error - we want to run all tests
+set +e
 
 # Configuration
 API_URL="${API_URL:-http://localhost:3000}"
@@ -147,10 +148,8 @@ cached2=$(echo "$response2" | grep -o '"cached":[^,]*' | cut -d: -f2)
 
 if [ "$cached1" == "false" ] && [ "$cached2" == "true" ]; then
     print_success "First request not cached, second request cached"
-    ((TESTS_PASSED++))
 else
     print_failure "Cache behavior incorrect (cached1: $cached1, cached2: $cached2)"
-    ((TESTS_FAILED++))
 fi
 
 # Test 7: Invalid request - missing parentID
@@ -215,10 +214,8 @@ health_code=$(echo "$health_response" | tail -n1)
 
 if [ "$health_code" -eq 200 ]; then
     print_success "Health endpoint returned 200"
-    ((TESTS_PASSED++))
 else
     print_failure "Health endpoint returned $health_code (expected 200)"
-    ((TESTS_FAILED++))
 fi
 
 print_test "Test $((TESTS_RUN + 1)): Readiness check endpoint"
@@ -228,10 +225,8 @@ readiness_code=$(echo "$readiness_response" | tail -n1)
 
 if [ "$readiness_code" -eq 200 ]; then
     print_success "Readiness endpoint returned 200"
-    ((TESTS_PASSED++))
 else
     print_failure "Readiness endpoint returned $readiness_code (expected 200)"
-    ((TESTS_FAILED++))
 fi
 
 print_test "Test $((TESTS_RUN + 1)): Liveness check endpoint"
@@ -241,10 +236,8 @@ liveness_code=$(echo "$liveness_response" | tail -n1)
 
 if [ "$liveness_code" -eq 200 ]; then
     print_success "Liveness endpoint returned 200"
-    ((TESTS_PASSED++))
 else
     print_failure "Liveness endpoint returned $liveness_code (expected 200)"
-    ((TESTS_FAILED++))
 fi
 
 # Print summary

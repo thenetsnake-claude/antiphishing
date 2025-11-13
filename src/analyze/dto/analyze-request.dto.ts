@@ -5,10 +5,10 @@ import { IsString, IsUUID, MaxLength, IsNotEmpty } from 'class-validator';
  * Validates incoming analysis requests
  */
 export class AnalyzeRequestDto {
-  @IsUUID('4', { message: 'parentID must be a valid UUID' })
+  @IsUUID('all', { message: 'parentID must be a valid UUID' })
   parentID: string;
 
-  @IsUUID('4', { message: 'customerID must be a valid UUID' })
+  @IsUUID('all', { message: 'customerID must be a valid UUID' })
   customerID: string;
 
   @IsString({ message: 'senderID must be a string' })
@@ -20,6 +20,6 @@ export class AnalyzeRequestDto {
   @MaxLength(2000, { message: 'content must be shorter than or equal to 2000 characters' })
   content: string;
 
-  @IsUUID('4', { message: 'messageID must be a valid UUID' })
+  @IsUUID('all', { message: 'messageID must be a valid UUID' })
   messageID: string;
 }

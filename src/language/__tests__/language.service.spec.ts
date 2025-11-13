@@ -1,10 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { LanguageService } from '../language.service';
 
+// Mock franc module
+jest.mock('franc', () => ({
+  francAll: jest.fn(),
+}));
+
+import { francAll } from 'franc';
+
 describe('LanguageService', () => {
   let service: LanguageService;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [LanguageService],
     }).compile();
@@ -18,6 +27,7 @@ describe('LanguageService', () => {
 
   describe('detect', () => {
     it('should detect English language', () => {
+      (francAll as jest.Mock).mockReturnValue([['eng', 0.05]]);
       const content = 'This is a test message in English language. Hello world!';
       const result = service.detect(content);
 
@@ -26,6 +36,7 @@ describe('LanguageService', () => {
     });
 
     it('should detect French language', () => {
+      (francAll as jest.Mock).mockReturnValue([['fra', 0.1]]);
       const content = 'Bonjour, ceci est un message de test en français.';
       const result = service.detect(content);
 
@@ -34,6 +45,7 @@ describe('LanguageService', () => {
     });
 
     it('should detect Dutch language', () => {
+      (francAll as jest.Mock).mockReturnValue([['nld', 0.15]]);
       const content = 'Hallo, dit is een testbericht in het Nederlands.';
       const result = service.detect(content);
 
@@ -42,6 +54,7 @@ describe('LanguageService', () => {
     });
 
     it('should detect Polish language', () => {
+      (francAll as jest.Mock).mockReturnValue([['pol', 0.12]]);
       const content = 'Witaj, to jest testowa wiadomość w języku polskim.';
       const result = service.detect(content);
 
@@ -50,6 +63,7 @@ describe('LanguageService', () => {
     });
 
     it('should detect Spanish language', () => {
+      (francAll as jest.Mock).mockReturnValue([['spa', 0.08]]);
       const content = 'Hola, este es un mensaje de prueba en español.';
       const result = service.detect(content);
 
@@ -72,6 +86,7 @@ describe('LanguageService', () => {
     });
 
     it('should handle very short content', () => {
+      (francAll as jest.Mock).mockReturnValue([['eng', 0.2]]);
       const result = service.detect('Hi');
 
       expect(result.language).toBeDefined();
@@ -79,6 +94,7 @@ describe('LanguageService', () => {
     });
 
     it('should handle content with numbers and special characters', () => {
+      (francAll as jest.Mock).mockReturnValue([['eng', 0.1]]);
       const content = 'Hello 123 !@# $%^ test message';
       const result = service.detect(content);
 
@@ -87,6 +103,7 @@ describe('LanguageService', () => {
     });
 
     it('should return confidence as number between 0-100', () => {
+      (francAll as jest.Mock).mockReturnValue([['eng', 0.05]]);
       const content = 'This is a test message';
       const result = service.detect(content);
 

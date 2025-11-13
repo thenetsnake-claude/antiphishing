@@ -1,9 +1,9 @@
 export default () => ({
   nodeEnv: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT, 10) || 3000,
+  port: parseInt(process.env.PORT || '3000', 10),
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
     sentinelHosts: process.env.REDIS_SENTINEL_HOSTS
       ? process.env.REDIS_SENTINEL_HOSTS.split(',')
       : [],

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { franc, francAll } from 'franc';
+import { francAll } from 'franc';
 
 export interface LanguageDetectionResult {
   language: string;

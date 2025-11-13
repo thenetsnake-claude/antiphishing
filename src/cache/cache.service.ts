@@ -177,7 +177,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    * @param value - Value to cache
    * @param ttl - Time to live in seconds
    */
-  async set(content: string, value: any, ttl: number): Promise<void> {
+  async set(content: string, value: unknown, ttl: number): Promise<void> {
     if (!this.isConnected) {
       this.logger.warn('Redis not connected, skipping cache set');
       return;

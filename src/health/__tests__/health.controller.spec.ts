@@ -5,8 +5,6 @@ import { CacheService } from '../../cache/cache.service';
 
 describe('HealthController', () => {
   let controller: HealthController;
-  let cacheService: CacheService;
-  let healthCheckService: HealthCheckService;
 
   const mockCacheService = {
     isHealthy: jest.fn(),
@@ -34,8 +32,6 @@ describe('HealthController', () => {
     }).compile();
 
     controller = module.get<HealthController>(HealthController);
-    cacheService = module.get<CacheService>(CacheService);
-    healthCheckService = module.get<HealthCheckService>(HealthCheckService);
   });
 
   it('should be defined', () => {
@@ -46,7 +42,7 @@ describe('HealthController', () => {
     it('should return health status with Redis up', async () => {
       mockCacheService.isHealthy.mockResolvedValue(true);
       mockHealthCheckService.check.mockImplementation(async (checks) => {
-        const results = await Promise.all(checks.map((check) => check()));
+        const results = await Promise.all(checks.map((check: () => Promise<unknown>) => check()));
         return {
           status: 'ok',
           info: results[0],
@@ -64,7 +60,7 @@ describe('HealthController', () => {
     it('should return health status with Redis down', async () => {
       mockCacheService.isHealthy.mockResolvedValue(false);
       mockHealthCheckService.check.mockImplementation(async (checks) => {
-        const results = await Promise.all(checks.map((check) => check()));
+        const results = await Promise.all(checks.map((check: () => Promise<unknown>) => check()));
         return {
           status: 'ok',
           info: results[0],
@@ -73,7 +69,7 @@ describe('HealthController', () => {
         };
       });
 
-      const result = await controller.check();
+      await controller.check();
 
       expect(mockCacheService.isHealthy).toHaveBeenCalled();
     });
