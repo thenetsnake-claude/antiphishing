@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import LinkifyIt from 'linkify-it';
-import tlds from 'tlds';
+import LinkifyIt = require('linkify-it');
+import tlds = require('tlds');
 import { CacheService } from '../cache/cache.service';
 import { LanguageService } from '../language/language.service';
 import { AnalyzeRequestDto } from './dto/analyze-request.dto';
@@ -129,8 +129,8 @@ export class AnalyzeService {
     }
 
     // Extract and normalize URLs
-    const urls = matches
-      .map(match => {
+    const urls: string[] = matches
+      .map((match: LinkifyIt.Match) => {
         let url = match.url;
 
         // Ensure protocol is present
