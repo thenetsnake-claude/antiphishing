@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import LinkifyIt = require('linkify-it');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import tlds = require('tlds');
 import { CacheService } from '../cache/cache.service';
 import { LanguageService } from '../language/language.service';
@@ -58,7 +60,12 @@ export class AnalyzeService {
     const languageResult = this.languageService.detect(request.content);
 
     // Build analysis result
-    const analysis = this.buildAnalysis(languageResult, false, Date.now() - startTime, request.content);
+    const analysis = this.buildAnalysis(
+      languageResult,
+      false,
+      Date.now() - startTime,
+      request.content,
+    );
 
     // Cache the analysis result
     await this.cacheService.set(request.content, analysis, this.CACHE_TTL);
@@ -129,17 +136,16 @@ export class AnalyzeService {
     }
 
     // Extract and normalize URLs
-    const urls: string[] = matches
-      .map((match: LinkifyIt.Match) => {
-        let url = match.url;
+    const urls: string[] = matches.map((match: LinkifyIt.Match) => {
+      let url = match.url;
 
-        // Ensure protocol is present
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-          url = `http://${url}`;
-        }
+      // Ensure protocol is present
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = `http://${url}`;
+      }
 
-        return url;
-      });
+      return url;
+    });
 
     // Remove duplicates and return
     return [...new Set(urls)];

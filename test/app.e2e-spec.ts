@@ -218,8 +218,7 @@ describe('Antiphishing API (e2e)', () => {
           .post('/analyze')
           .send({
             ...validRequest,
-            content:
-              'Visit https://example.com and also https://example.com for more information',
+            content: 'Visit https://example.com and also https://example.com for more information',
           })
           .expect(200)
           .expect((res) => {

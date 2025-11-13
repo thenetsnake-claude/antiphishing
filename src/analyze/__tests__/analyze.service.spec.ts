@@ -313,9 +313,7 @@ describe('AnalyzeService', () => {
     });
 
     it('should deduplicate identical URLs', async () => {
-      const request = createMockRequest(
-        'Visit https://example.com and https://example.com again',
-      );
+      const request = createMockRequest('Visit https://example.com and https://example.com again');
       const result = await service.analyze(request);
 
       expect(result.analysis.enhanced.urls).toHaveLength(1);
@@ -350,9 +348,7 @@ describe('AnalyzeService', () => {
       const request = createMockRequest('Download: https://example.com/file-name_v2.0.pdf');
       const result = await service.analyze(request);
 
-      expect(result.analysis.enhanced.urls).toContain(
-        'https://example.com/file-name_v2.0.pdf',
-      );
+      expect(result.analysis.enhanced.urls).toContain('https://example.com/file-name_v2.0.pdf');
       expect(result.analysis.enhanced.urls).toHaveLength(1);
     });
 
@@ -392,9 +388,7 @@ describe('AnalyzeService', () => {
     });
 
     it('should detect domains but not emails in same content', async () => {
-      const request = createMockRequest(
-        'Visit example.com or email info@test.org for details',
-      );
+      const request = createMockRequest('Visit example.com or email info@test.org for details');
       const result = await service.analyze(request);
 
       expect(result.analysis.enhanced.urls).toContain('http://example.com');
@@ -403,9 +397,7 @@ describe('AnalyzeService', () => {
     });
 
     it('should handle mixed protocol and bare domains', async () => {
-      const request = createMockRequest(
-        'Visit https://secure.com, example.org, and www.test.net',
-      );
+      const request = createMockRequest('Visit https://secure.com, example.org, and www.test.net');
       const result = await service.analyze(request);
 
       expect(result.analysis.enhanced.urls).toContain('https://secure.com');
@@ -437,9 +429,7 @@ describe('AnalyzeService', () => {
     });
 
     it('should detect all types of TLDs including generic and sponsored', async () => {
-      const request = createMockRequest(
-        'Visit example.museum, test.aero, and demo.travel today',
-      );
+      const request = createMockRequest('Visit example.museum, test.aero, and demo.travel today');
       const result = await service.analyze(request);
 
       expect(result.analysis.enhanced.urls).toContain('http://example.museum');
