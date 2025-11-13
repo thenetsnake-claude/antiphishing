@@ -6,8 +6,6 @@ import { AnalyzeRequestDto } from '../dto/analyze-request.dto';
 
 describe('AnalyzeService', () => {
   let service: AnalyzeService;
-  let cacheService: CacheService;
-  let languageService: LanguageService;
 
   const mockCacheService = {
     get: jest.fn(),
@@ -38,8 +36,6 @@ describe('AnalyzeService', () => {
     }).compile();
 
     service = module.get<AnalyzeService>(AnalyzeService);
-    cacheService = module.get<CacheService>(CacheService);
-    languageService = module.get<LanguageService>(LanguageService);
   });
 
   it('should be defined', () => {

@@ -3,10 +3,11 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import prettierConfig from 'eslint-config-prettier';
 import prettierPlugin from 'eslint-plugin-prettier';
+import globals from 'globals';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.js', '*.mjs'],
   },
   eslint.configs.recommended,
   {
@@ -19,8 +20,8 @@ export default [
         sourceType: 'module',
       },
       globals: {
-        node: true,
-        jest: true,
+        ...globals.node,
+        ...globals.jest,
       },
     },
     plugins: {

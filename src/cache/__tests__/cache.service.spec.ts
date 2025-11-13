@@ -18,11 +18,10 @@ jest.mock('ioredis', () => {
 
 describe('CacheService', () => {
   let service: CacheService;
-  let configService: ConfigService;
 
   const mockConfigService = {
     get: jest.fn((key: string) => {
-      const config: Record<string, any> = {
+      const config: Record<string, unknown> = {
         nodeEnv: 'development',
         'redis.host': 'localhost',
         'redis.port': 6379,
@@ -51,7 +50,6 @@ describe('CacheService', () => {
     }).compile();
 
     service = module.get<CacheService>(CacheService);
-    configService = module.get<ConfigService>(ConfigService);
 
     // Initialize the service
     await service.onModuleInit();
@@ -137,11 +135,7 @@ describe('CacheService', () => {
       await service.set(content, value, ttl);
 
       expect(mockRedis.setex).toHaveBeenCalledTimes(1);
-      expect(mockRedis.setex).toHaveBeenCalledWith(
-        expect.any(String),
-        ttl,
-        JSON.stringify(value),
-      );
+      expect(mockRedis.setex).toHaveBeenCalledWith(expect.any(String), ttl, JSON.stringify(value));
     });
 
     it('should not throw error on Redis failure', async () => {

@@ -5,8 +5,6 @@ import { CacheService } from '../../cache/cache.service';
 
 describe('HealthController', () => {
   let controller: HealthController;
-  let cacheService: CacheService;
-  let healthCheckService: HealthCheckService;
 
   const mockCacheService = {
     isHealthy: jest.fn(),
@@ -34,8 +32,6 @@ describe('HealthController', () => {
     }).compile();
 
     controller = module.get<HealthController>(HealthController);
-    cacheService = module.get<CacheService>(CacheService);
-    healthCheckService = module.get<HealthCheckService>(HealthCheckService);
   });
 
   it('should be defined', () => {
@@ -73,7 +69,7 @@ describe('HealthController', () => {
         };
       });
 
-      const result = await controller.check();
+      await controller.check();
 
       expect(mockCacheService.isHealthy).toHaveBeenCalled();
     });

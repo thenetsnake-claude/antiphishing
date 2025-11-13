@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Response } from 'express';
@@ -17,7 +11,7 @@ import { Response } from 'express';
 export class ProcessingTimeInterceptor implements NestInterceptor {
   private readonly logger = new Logger(ProcessingTimeInterceptor.name);
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const startTime = Date.now();
     const response = context.switchToHttp().getResponse<Response>();
 
