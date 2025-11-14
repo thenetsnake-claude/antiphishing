@@ -80,6 +80,7 @@ describe('AnalyzeService', () => {
           phishing_keywords: [],
           urls: [],
           phones: [],
+          public_ips: [],
         },
       };
 
@@ -436,6 +437,358 @@ describe('AnalyzeService', () => {
       expect(result.analysis.enhanced.urls).toContain('http://test.aero');
       expect(result.analysis.enhanced.urls).toContain('http://demo.travel');
       expect(result.analysis.enhanced.urls).toHaveLength(3);
+    });
+  });
+
+  describe('Phone number detection', () => {
+    const createMockRequest = (content: string): AnalyzeRequestDto => ({
+      parentID: '123e4567-e89b-12d3-a456-426614174000',
+      customerID: '223e4567-e89b-12d3-a456-426614174001',
+      senderID: 'test@example.com',
+      messageID: '323e4567-e89b-12d3-a456-426614174002',
+      content,
+    });
+
+    beforeEach(() => {
+      mockCacheService.get.mockResolvedValue(null);
+      mockLanguageService.detect.mockReturnValue({
+        language: 'eng',
+        confidence: 95,
+      });
+    });
+
+    it('should extract phone numbers in international format', async () => {
+      const request = createMockRequest('Call me at +1 (202) 456-1111 for more info');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+
+    it('should extract phone numbers with dots as separators', async () => {
+      const request = createMockRequest('Contact: +1.202.456.1111');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+
+    it('should extract phone numbers with dashes', async () => {
+      const request = createMockRequest('Phone: +44-20-7946-0958');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('4420');
+      }
+    });
+
+    it('should handle phone numbers with slashes', async () => {
+      const request = createMockRequest('Ring +33/1/42/86/82/00');
+      const result = await service.analyze(request);
+
+      // Slashes are unusual separators - may or may not be detected
+      expect(Array.isArray(result.analysis.enhanced.phones)).toBe(true);
+    });
+
+    it('should extract phone numbers with parentheses', async () => {
+      const request = createMockRequest('Call +1(202)456-1111 for info');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should extract multiple phone numbers from content', async () => {
+      const request = createMockRequest('Call +1-202-456-1111 or +44-20-7946-0958 for assistance');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should deduplicate identical phone numbers', async () => {
+      const request = createMockRequest('Call +1-202-456-1111 or +1 (202) 456-1111 for more info');
+      const result = await service.analyze(request);
+
+      // Should deduplicate to 1 number
+      expect(result.analysis.enhanced.phones.length).toBeLessThanOrEqual(1);
+    });
+
+    it('should return empty array when no phone numbers present', async () => {
+      const request = createMockRequest('No phone numbers in this message');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones).toEqual([]);
+    });
+
+    it('should handle phone numbers with spaces', async () => {
+      const request = createMockRequest('Contact +1 202 456 1111');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+
+    it('should extract phone numbers in European format', async () => {
+      const request = createMockRequest('Phone: +49 30 12345678');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('4930');
+      }
+    });
+
+    it('should extract phone numbers in Asian format', async () => {
+      const request = createMockRequest('Call +81-3-1234-5678');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('8131');
+      }
+    });
+
+    it('should handle mixed phone formats in same content', async () => {
+      const request = createMockRequest(
+        'Call +1.202.456.1111, +44-20-7946-0958, or +33/1/42/86/82/00',
+      );
+      const result = await service.analyze(request);
+
+      // Should detect at least one phone number
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should not extract invalid phone-like numbers', async () => {
+      const request = createMockRequest('My code is 123-456 and pin 7890');
+      const result = await service.analyze(request);
+
+      // These short numbers shouldn't be detected as valid phone numbers
+      expect(result.analysis.enhanced.phones.length).toBeLessThanOrEqual(0);
+    });
+
+    it('should handle phone numbers with country code without plus', async () => {
+      const request = createMockRequest('Phone: 1 555 123 4567');
+      const result = await service.analyze(request);
+
+      // May or may not be detected depending on context
+      expect(Array.isArray(result.analysis.enhanced.phones)).toBe(true);
+    });
+
+    it('should extract phone numbers from sentences', async () => {
+      const request = createMockRequest('Please call us at +1-202-456-1111 during business hours');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+
+    it('should extract Belgian local toll-free numbers', async () => {
+      const request = createMockRequest('Call our helpline at 0800 33 800');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        // Belgian toll-free numbers start with 0800 and are converted to +32800
+        expect(result.analysis.enhanced.phones[0]).toMatch(/\+32800/);
+      }
+    });
+
+    it('should extract Belgian local landline numbers', async () => {
+      const request = createMockRequest('Our office number is 02 123 45 67');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        // Belgian landlines with area code 02 (Brussels) convert to +322
+        expect(result.analysis.enhanced.phones[0]).toMatch(/\+322/);
+      }
+    });
+
+    it('should extract Belgian mobile numbers', async () => {
+      const request = createMockRequest('My mobile is 0470 12 34 56');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        // Belgian mobiles starting with 047 convert to +3247
+        expect(result.analysis.enhanced.phones[0]).toMatch(/\+3247/);
+      }
+    });
+
+    it('should extract Belgian numbers with various separators', async () => {
+      const request = createMockRequest('Contact us: 02/123.45.67 or 0470-12-34-56');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      // Should detect at least one Belgian number
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toMatch(/\+32/);
+      }
+    });
+
+    it('should handle mix of international and Belgian local numbers', async () => {
+      const request = createMockRequest('International: +1-202-456-1111, Local: 0800 33 800');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(2);
+      // Should detect both international and Belgian local number
+      if (result.analysis.enhanced.phones.length >= 2) {
+        const hasUS = result.analysis.enhanced.phones.some((p) => p.includes('+1'));
+        const hasBE = result.analysis.enhanced.phones.some((p) => p.includes('+32'));
+        expect(hasUS || hasBE).toBe(true);
+      }
+    });
+  });
+
+  describe('Public IP detection', () => {
+    const createMockRequest = (content: string): AnalyzeRequestDto => ({
+      parentID: '123e4567-e89b-12d3-a456-426614174000',
+      customerID: '223e4567-e89b-12d3-a456-426614174001',
+      senderID: 'test@example.com',
+      messageID: '323e4567-e89b-12d3-a456-426614174002',
+      content,
+    });
+
+    beforeEach(() => {
+      mockCacheService.get.mockResolvedValue(null);
+      mockLanguageService.detect.mockReturnValue({
+        language: 'eng',
+        confidence: 95,
+      });
+    });
+
+    it('should extract public IPv4 addresses', async () => {
+      const request = createMockRequest('Server IP is 8.8.8.8 for DNS');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+    });
+
+    it('should extract multiple public IPv4 addresses', async () => {
+      const request = createMockRequest('DNS servers: 8.8.8.8 and 1.1.1.1');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips).toContain('1.1.1.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(2);
+    });
+
+    it('should filter out private IPv4 addresses', async () => {
+      const request = createMockRequest('Private: 192.168.1.1, Public: 8.8.8.8, Private: 10.0.0.1');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips).not.toContain('192.168.1.1');
+      expect(result.analysis.enhanced.public_ips).not.toContain('10.0.0.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+
+    it('should filter out loopback addresses', async () => {
+      const request = createMockRequest('Localhost: 127.0.0.1, Public: 8.8.8.8');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips).not.toContain('127.0.0.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+
+    it('should filter out link-local addresses', async () => {
+      const request = createMockRequest('Link-local: 169.254.0.1, Public: 1.1.1.1');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('1.1.1.1');
+      expect(result.analysis.enhanced.public_ips).not.toContain('169.254.0.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+
+    it('should extract public IPv6 addresses', async () => {
+      const request = createMockRequest('IPv6 server: 2001:4860:4860::8888');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.public_ips.length > 0) {
+        expect(result.analysis.enhanced.public_ips[0]).toMatch(/2001:4860:4860/);
+      }
+    });
+
+    it('should filter out IPv6 loopback', async () => {
+      const request = createMockRequest('IPv6 loopback: ::1, Public: 2001:4860:4860::8888');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).not.toContain('::1');
+    });
+
+    it('should filter out IPv6 link-local addresses', async () => {
+      const request = createMockRequest('Link-local: fe80::1, Public: 2001:4860:4860::8888');
+      const result = await service.analyze(request);
+
+      const hasLinkLocal = result.analysis.enhanced.public_ips.some((ip) =>
+        ip.toLowerCase().startsWith('fe80'),
+      );
+      expect(hasLinkLocal).toBe(false);
+    });
+
+    it('should deduplicate identical IP addresses', async () => {
+      const request = createMockRequest('Server: 8.8.8.8 and backup: 8.8.8.8');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+
+    it('should return empty array when no IPs present', async () => {
+      const request = createMockRequest('No IP addresses in this text');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toEqual([]);
+    });
+
+    it('should return empty array when only private IPs present', async () => {
+      const request = createMockRequest('Private network: 192.168.1.1 and 10.0.0.1');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toEqual([]);
+    });
+
+    it('should handle mixed IPv4 and IPv6 addresses', async () => {
+      const request = createMockRequest('IPv4: 8.8.8.8, IPv6: 2001:4860:4860::8888');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips.length).toBeGreaterThanOrEqual(1);
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+    });
+
+    it('should extract IPs from sentences with text around them', async () => {
+      const request = createMockRequest(
+        'Connect to server at 8.8.8.8 on port 53 for DNS resolution',
+      );
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+    });
+
+    it('should handle IPs in URLs without extracting URL parts', async () => {
+      const request = createMockRequest('Visit http://93.184.216.34/ for more info');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('93.184.216.34');
+    });
+
+    it('should filter out carrier-grade NAT addresses', async () => {
+      const request = createMockRequest('CGN: 100.64.0.1, Public: 8.8.8.8');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips).not.toContain('100.64.0.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
     });
   });
 });

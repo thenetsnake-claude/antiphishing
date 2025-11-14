@@ -8,6 +8,9 @@ Build a NestJS-based content analysis API that detects language from incoming me
 - **Framework**: NestJS
 - **Node.js Version**: 22
 - **Language Detection**: franc library
+- **URL Detection**: linkify-it library with tlds package
+- **Phone Number Detection**: libphonenumber-js library
+- **Public IP Detection**: ipaddr.js library
 - **Cache**: Redis (with Sentinel support for production)
 - **Test Coverage**: Minimum 75%
 
@@ -52,7 +55,8 @@ Build a NestJS-based content analysis API that detects language from incoming me
       "suspicious_tld": "",
       "phishing_keywords": [],
       "urls": [],
-      "phones": []
+      "phones": [],
+      "public_ips": []
     }
   }
 }
@@ -115,6 +119,207 @@ Local Redis using Docker Compose (no sentinels, no TLS)
 - Include confidence percentage in `lang_certainity` field
 - Never fail the request due to language detection issues
 
+## URL Detection
+
+### Overview
+The API automatically extracts and normalizes URLs from message content and returns them in the `analysis.enhanced.urls` array.
+
+### Library
+- Use `linkify-it` library (v5.0.0) for URL detection
+- Use `tlds` library for comprehensive TLD support
+- Supports fuzzy matching for bare domains without protocols
+
+### Supported URL Formats
+1. **URLs with protocols**
+   - `http://example.com`
+   - `https://secure.example.com`
+
+2. **URLs starting with www.**
+   - `www.example.com` (automatically prefixed with `http://`)
+
+3. **Bare domains**
+   - `example.com` (automatically prefixed with `http://`)
+   - `subdomain.example.org`
+   - Supports ALL official TLDs (1500+)
+
+4. **URLs with paths and parameters**
+   - `https://example.com/path/to/page`
+   - `https://example.com/page?param=value`
+   - `https://example.com/page#anchor`
+
+### TLD Support
+- Supports **ALL official TLDs** (1500+)
+- Includes generic TLDs: .com, .org, .net, .edu, .gov, .mil, .int
+- Includes country-code TLDs: .uk, .de, .fr, .jp, .cn, .au, .br, etc.
+- Includes new gTLDs: .io, .dev, .app, .tech, .cloud, .online, .shop, .xyz, etc.
+- Includes special-use TLDs: .museum, .aero, .travel, .coop, .jobs, etc.
+- Includes multi-level TLDs: .co.uk, .com.au, .co.za, .com.br, etc.
+- TLD database automatically updated with `tlds` package
+
+### Email Address Filtering
+- **Does NOT detect** email addresses as URLs
+- Email domains are specifically excluded (e.g., `user@example.com`)
+- Only standalone domain names are detected as URLs
+
+### URL Normalization
+- Trailing punctuation automatically removed (periods, commas, semicolons, etc.)
+- Bare domains prefixed with `http://`
+- URLs starting with `www.` prefixed with `http://`
+- Duplicate URLs automatically deduplicated
+- Returns empty array `[]` when no URLs found
+
+### Technical Implementation
+- TypeScript `import = require()` syntax used for module compatibility
+- Works with both `npm run build` and `npm run start:dev` (watch mode)
+- ESLint exceptions added for require-style imports
+- Type-safe with LinkifyIt.Match interface
+
+### Failure Handling
+- If URL detection fails: return empty array `[]`
+- Never fail the request due to URL detection issues
+- Gracefully handle malformed content
+
+## Phone Number Detection
+
+### Overview
+The API automatically extracts and normalizes phone numbers from message content and returns them in the `analysis.enhanced.phones` array.
+
+### Library
+- Use `libphonenumber-js` library (v1.12.26) for phone number detection
+- Comprehensive international phone number parsing library
+- Based on Google's libphonenumber library
+- Supports phone numbers from all countries and regions
+
+### Supported Phone Number Formats
+1. **International format with country code**
+   - `+1 (202) 456-1111` (US format with parentheses)
+   - `+44-20-7946-0958` (UK format with dashes)
+   - `+49 30 12345678` (German format with spaces)
+   - `+81-3-1234-5678` (Japanese format)
+
+2. **Various separators supported**
+   - **Dashes**: `+1-202-456-1111`
+   - **Dots**: `+1.202.456.1111`
+   - **Spaces**: `+1 202 456 1111`
+   - **Parentheses**: `+1 (202) 456-1111`, `+1(202)456-1111`
+   - **Slashes**: `+33/1/42/86/82/00` (less common, may not always be detected)
+
+3. **Mixed formats in same content**
+   - Multiple phone numbers with different separators can be detected in the same message
+
+### Output Format
+- **E.164 International Format**: All phone numbers returned as E.164 strings
+  - Example: `+12024561111` (no spaces, dashes, or parentheses)
+  - Always includes country code prefix with `+`
+  - Consistent format regardless of input format
+  - Easy to store and compare
+
+### Phone Number Extraction Features
+- **Default Country**: Belgium (BE) - local Belgian numbers detected without country code
+- Detects phone numbers in various local and international formatting styles
+- Automatically normalizes all phone numbers to E.164 format
+- Supports phone numbers from all countries and regions worldwide
+- Handles multiple phone numbers in single message
+- Automatically deduplicates identical phone numbers
+- Returns empty array `[]` when no phone numbers found
+- Case-insensitive detection
+- Strips surrounding text and punctuation
+- Examples of Belgian local formats:
+  - Toll-free: `0800 33 800` → `+32800338 00`
+  - Brussels landline: `02 123 45 67` → `+3221234567`
+  - Mobile: `0470 12 34 56` → `+32470123456`
+
+### Technical Implementation
+- Uses `findPhoneNumbersInText()` function for broad detection
+- Belgium (BE) provided as default country for local number detection
+- Converts PhoneNumber objects to E.164 string format
+- TypeScript type safety with PhoneNumber interface
+- Duplicate removal using Set data structure
+
+### Failure Handling
+- If phone number extraction fails: return empty array `[]`
+- Never fail the request due to phone detection issues
+- Gracefully handle malformed phone numbers
+- Invalid phone-like text is filtered out
+
+### Privacy Considerations
+- Only extracts phone numbers, does not validate ownership
+- No storage or retention of phone numbers beyond response
+- Phone numbers logged in response metadata only
+
+## Public IP Address Detection
+
+### Overview
+The API automatically extracts and validates public IP addresses from message content and returns them in the `analysis.enhanced.public_ips` array.
+
+### Library
+- Use `ipaddr.js` library for IP address parsing and validation
+- Comprehensive IPv4 and IPv6 address parsing
+- Built-in detection of private, reserved, and special-use ranges
+
+### Supported IP Address Formats
+1. **IPv4 addresses**
+   - Standard dotted-decimal notation: `8.8.8.8`, `1.1.1.1`
+   - All valid IPv4 addresses from 0.0.0.0 to 255.255.255.255
+
+2. **IPv6 addresses**
+   - Full format: `2001:4860:4860::8888`
+   - Compressed format with double colons
+   - Mixed IPv4/IPv6 format support
+
+### Private IP Filtering
+The API automatically filters out **private and special-use IP addresses**:
+
+**IPv4 Private Ranges (filtered out):**
+- `10.0.0.0/8` - Private networks
+- `172.16.0.0/12` - Private networks
+- `192.168.0.0/16` - Private networks
+- `127.0.0.0/8` - Loopback addresses
+- `169.254.0.0/16` - Link-local addresses
+- `100.64.0.0/10` - Carrier-grade NAT
+- Reserved and broadcast addresses
+
+**IPv6 Private Ranges (filtered out):**
+- `::1` - Loopback
+- `fe80::/10` - Link-local addresses
+- `fc00::/7` - Unique local addresses
+- Multicast and reserved addresses
+
+### Output Format
+- Returns only **public (routable) IP addresses**
+- IPv4 addresses returned in standard dotted-decimal format
+- IPv6 addresses returned in standard hexadecimal format
+- Automatically deduplicates identical addresses
+
+### Public IP Detection Features
+- Detects both IPv4 and IPv6 addresses in content
+- Filters out all private, reserved, and special-use ranges
+- Returns only publicly routable IP addresses
+- Handles multiple IP addresses in single message
+- Automatically deduplicates identical addresses
+- Returns empty array `[]` when no public IPs found
+- Extracts IPs from sentences, URLs, and mixed content
+- Case-insensitive detection
+
+### Technical Implementation
+- Uses regex patterns for IPv4 and IPv6 detection
+- Validates detected IPs using ipaddr.js library
+- Checks IP range type (private, public, loopback, etc.)
+- Filters based on range classification
+- Duplicate removal using Set data structure
+
+### Failure Handling
+- If IP extraction fails: return empty array `[]`
+- Never fail the request due to IP detection issues
+- Gracefully handle malformed IP-like strings
+- Invalid IP addresses are filtered out
+
+### Security Considerations
+- Only extracts IP addresses, does not perform lookups
+- No geolocation or reverse DNS queries
+- No storage or retention of IPs beyond response
+- IP addresses logged in response metadata only
+
 ## Health Checks
 
 ### Required Endpoints
@@ -164,6 +369,9 @@ Health checks should verify:
 - Integration tests for API endpoints
 - Tests for Redis caching (with mocked Redis)
 - Tests for language detection
+- Tests for URL detection
+- Tests for phone number detection
+- Tests for public IP detection
 - Tests for validation rules
 
 ### Test Scenarios (cURL)
@@ -178,6 +386,22 @@ Create a script with test scenarios for:
 - Invalid request (content too long)
 - Invalid request (invalid GUID format)
 - Cache hit scenario (same content twice)
+- URL detection with protocol (http://, https://)
+- URL detection with www prefix
+- URL detection with bare domains
+- URL detection should not detect emails
+- Phone detection with dashes
+- Phone detection with dots
+- Phone detection with parentheses
+- Phone detection with multiple numbers
+- Phone detection should return empty array when no phones
+- Phone detection with Belgian toll-free number
+- Phone detection with Belgian landline
+- Phone detection with Belgian mobile
+- Public IP detection with IPv4 address
+- Public IP detection should filter out private IPs
+- Public IP detection with multiple IPs
+- Public IP detection should return empty array when no public IPs
 
 ## Validation Rules
 
@@ -317,15 +541,55 @@ antiphishing-api/
 ## Clarifications Provided
 
 1. **Language Detection Library**: franc
-2. **Cache Key Strategy**: Only content field
-3. **Language Detection Failure**: Return "unknown" with confidence in lang_certainity
-4. **Error Response Format**: Standard NestJS format
-5. **Node.js Version**: 22
-6. **Redis Env Vars**: REDIS_SENTINEL_HOSTS, REDIS_PASSWORD, REDIS_USERNAME, REDIS_TLS_ENABLED, REDIS_MASTER_NAME
-7. **Additional Endpoints**: health, readiness, liveness
-8. **Logging**: Log all except content, JSON to file (daily rotation) + console for dev
-9. **Project Name**: antiphishing-api
-10. **Status Codes**: 200 OK, 400 Bad Request, continue without cache if Redis down
+2. **URL Detection Library**: linkify-it with tlds package for universal TLD support
+3. **Phone Number Detection Library**: libphonenumber-js with E.164 output format
+4. **Public IP Detection Library**: ipaddr.js with private IP filtering
+5. **Cache Key Strategy**: Only content field
+6. **Language Detection Failure**: Return "unknown" with confidence in lang_certainity
+7. **URL Detection Failure**: Return empty array []
+8. **Phone Detection Failure**: Return empty array []
+9. **Public IP Detection Failure**: Return empty array []
+10. **Error Response Format**: Standard NestJS format
+11. **Node.js Version**: 22
+12. **Redis Env Vars**: REDIS_SENTINEL_HOSTS, REDIS_PASSWORD, REDIS_USERNAME, REDIS_TLS_ENABLED, REDIS_MASTER_NAME
+13. **Additional Endpoints**: health, readiness, liveness
+14. **Logging**: Log all except content, JSON to file (daily rotation) + console for dev
+15. **Project Name**: antiphishing-api
+16. **Status Codes**: 200 OK, 400 Bad Request, continue without cache if Redis down
+
+## Implemented Features
+
+### URL Detection (Added)
+- Automatically extracts URLs from message content
+- Supports http://, https://, www., and bare domains
+- Supports ALL official TLDs (1500+) via linkify-it and tlds libraries
+- Filters out email addresses
+- Normalizes URLs and removes duplicates
+- Returns extracted URLs in `analysis.enhanced.urls` array
+- Comprehensive test coverage: 29 unit tests, 4 E2E tests, 4 cURL scenarios
+
+### Phone Number Detection (Added)
+- Automatically extracts phone numbers from message content
+- **Default country**: Belgium (BE) for local number detection
+- Supports Belgian local formats: toll-free (0800), landlines (02, 03, etc.), mobile (047x, 048x, 049x)
+- Supports international format with country codes
+- Handles various separators: dashes, dots, spaces, parentheses, slashes
+- Normalizes all phone numbers to E.164 international format
+- Supports phone numbers from all countries and regions worldwide
+- Automatically deduplicates identical phone numbers
+- Returns extracted phone numbers in `analysis.enhanced.phones` array
+- Comprehensive test coverage: 20 unit tests, 7 E2E tests, 8 cURL scenarios
+
+### Public IP Address Detection (Added)
+- Automatically extracts and validates public IP addresses from message content
+- Supports both IPv4 and IPv6 address formats
+- **Filters out private and reserved ranges**: 10.x, 172.16.x, 192.168.x, 127.x, 169.254.x, etc.
+- Returns only publicly routable IP addresses
+- IPv4: Standard dotted-decimal format (8.8.8.8)
+- IPv6: Standard hexadecimal format (2001:4860:4860::8888)
+- Automatically deduplicates identical addresses
+- Returns extracted public IPs in `analysis.enhanced.public_ips` array
+- Comprehensive test coverage: 15 unit tests, 5 E2E tests, 4 cURL scenarios
 
 ## Notes
 - All placeholder values (status: "safe", certainity: 0, etc.) are hardcoded for now

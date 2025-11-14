@@ -287,6 +287,185 @@ describe('Antiphishing API (e2e)', () => {
       });
     });
 
+    describe('Phone Number Detection', () => {
+      it('should detect international phone numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Call us at +1-202-456-1111 for support',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.phones.length > 0) {
+              expect(res.body.analysis.enhanced.phones[0]).toContain('1202');
+            }
+          });
+      });
+
+      it('should detect phone numbers with dots', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Contact: +1.202.456.1111',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+          });
+      });
+
+      it('should detect multiple phone numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Call +1-202-456-1111 or +44-20-7946-0958',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+          });
+      });
+
+      it('should return empty array when no phones present', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'This message has no phone numbers at all',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones).toEqual([]);
+          });
+      });
+
+      it('should detect Belgian local toll-free numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Call our helpline at 0800 33 800',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.phones.length > 0) {
+              expect(res.body.analysis.enhanced.phones[0]).toMatch(/\+32800/);
+            }
+          });
+      });
+
+      it('should detect Belgian local landline numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Our office number is 02 123 45 67',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.phones.length > 0) {
+              expect(res.body.analysis.enhanced.phones[0]).toMatch(/\+322/);
+            }
+          });
+      });
+
+      it('should detect Belgian mobile numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'My mobile is 0470 12 34 56',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.phones.length > 0) {
+              expect(res.body.analysis.enhanced.phones[0]).toMatch(/\+3247/);
+            }
+          });
+      });
+    });
+
+    describe('Public IP Detection', () => {
+      it('should detect public IPv4 addresses', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Server IP is 8.8.8.8 for DNS',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips).toContain('8.8.8.8');
+          });
+      });
+
+      it('should detect multiple public IPs', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'DNS servers: 8.8.8.8 and 1.1.1.1',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips).toContain('8.8.8.8');
+            expect(res.body.analysis.enhanced.public_ips).toContain('1.1.1.1');
+            expect(res.body.analysis.enhanced.public_ips.length).toBe(2);
+          });
+      });
+
+      it('should filter out private IP addresses', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Private: 192.168.1.1, Public: 8.8.8.8',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips).toContain('8.8.8.8');
+            expect(res.body.analysis.enhanced.public_ips).not.toContain('192.168.1.1');
+            expect(res.body.analysis.enhanced.public_ips.length).toBe(1);
+          });
+      });
+
+      it('should return empty array when no IPs present', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'No IP addresses in this message',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips).toEqual([]);
+          });
+      });
+
+      it('should detect IPv6 addresses', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'IPv6 server: 2001:4860:4860::8888',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.public_ips.length > 0) {
+              expect(res.body.analysis.enhanced.public_ips[0]).toMatch(/2001:4860:4860/);
+            }
+          });
+      });
+    });
+
     describe('Validation', () => {
       it('should return 400 for missing parentID', () => {
         const invalidRequest = { ...validRequest } as Record<string, unknown>;

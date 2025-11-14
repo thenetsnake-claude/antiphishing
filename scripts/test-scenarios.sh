@@ -278,6 +278,114 @@ run_test "URL detection - email not detected" 200 '{
   "messageID": "e23e4567-e89b-12d3-a456-426614174002"
 }' '"urls":\[\]'
 
+# Test 21: Phone detection - phone with dashes
+run_test "Phone detection - phone with dashes" 200 '{
+  "parentID": "f23e4567-e89b-12d3-a456-426614174000",
+  "customerID": "023e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Call us at +1-202-456-1111 for support",
+  "messageID": "123e4567-e89b-12d3-a456-426614174002"
+}' '"phones":\["+12024561111"\]'
+
+# Test 22: Phone detection - phone with dots
+run_test "Phone detection - phone with dots" 200 '{
+  "parentID": "023e4567-e89b-12d3-a456-426614174010",
+  "customerID": "123e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Contact +1.202.456.1111 today",
+  "messageID": "223e4567-e89b-12d3-a456-426614174012"
+}' '"phones":\["+12024561111"\]'
+
+# Test 23: Phone detection - phone with parentheses
+run_test "Phone detection - phone with parentheses" 200 '{
+  "parentID": "323e4567-e89b-12d3-a456-426614174010",
+  "customerID": "423e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Phone: +1 (202) 456-1111 for assistance",
+  "messageID": "523e4567-e89b-12d3-a456-426614174012"
+}' '"phones":\["+12024561111"\]'
+
+# Test 24: Phone detection - multiple phone numbers
+run_test "Phone detection - multiple phone numbers" 200 '{
+  "parentID": "623e4567-e89b-12d3-a456-426614174010",
+  "customerID": "723e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Call +1-202-456-1111 or +44-20-7946-0958",
+  "messageID": "823e4567-e89b-12d3-a456-426614174012"
+}' '"phones":\['
+
+# Test 25: Phone detection - no phones
+run_test "Phone detection - no phones" 200 '{
+  "parentID": "923e4567-e89b-12d3-a456-426614174010",
+  "customerID": "a23e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "This message has no phone numbers at all",
+  "messageID": "b23e4567-e89b-12d3-a456-426614174012"
+}' '"phones":\[\]'
+
+# Test 26: Phone detection - Belgian local toll-free number
+run_test "Phone detection - Belgian local toll-free" 200 '{
+  "parentID": "c23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "d23e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Call our helpline at 0800 33 800",
+  "messageID": "e23e4567-e89b-12d3-a456-426614174012"
+}' '"+32800'
+
+# Test 27: Phone detection - Belgian local landline
+run_test "Phone detection - Belgian local landline" 200 '{
+  "parentID": "f23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "023e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Our office number is 02 123 45 67",
+  "messageID": "123e4567-e89b-12d3-a456-426614174012"
+}' '"+322'
+
+# Test 28: Phone detection - Belgian mobile number
+run_test "Phone detection - Belgian mobile" 200 '{
+  "parentID": "223e4567-e89b-12d3-a456-426614174010",
+  "customerID": "323e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "My mobile is 0470 12 34 56",
+  "messageID": "423e4567-e89b-12d3-a456-426614174012"
+}' '"+3247'
+
+# Test 29: Public IP detection - IPv4 address
+run_test "Public IP detection - IPv4" 200 '{
+  "parentID": "523e4567-e89b-12d3-a456-426614174010",
+  "customerID": "623e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Server IP is 8.8.8.8 for DNS",
+  "messageID": "723e4567-e89b-12d3-a456-426614174012"
+}' '"8.8.8.8"'
+
+# Test 30: Public IP detection - filter private IPs
+run_test "Public IP detection - filter private" 200 '{
+  "parentID": "823e4567-e89b-12d3-a456-426614174010",
+  "customerID": "923e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Private: 192.168.1.1, Public: 8.8.8.8",
+  "messageID": "a23e4567-e89b-12d3-a456-426614174012"
+}' '"8.8.8.8"'
+
+# Test 31: Public IP detection - multiple IPs
+run_test "Public IP detection - multiple IPs" 200 '{
+  "parentID": "b23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "c23e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "DNS servers: 8.8.8.8 and 1.1.1.1",
+  "messageID": "d23e4567-e89b-12d3-a456-426614174012"
+}' '"public_ips":\['
+
+# Test 32: Public IP detection - no public IPs
+run_test "Public IP detection - no public IPs" 200 '{
+  "parentID": "e23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "f23e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "No IP addresses in this text",
+  "messageID": "023e4567-e89b-12d3-a456-426614174012"
+}' '"public_ips":\[\]'
+
 # Test Health Endpoints
 print_test "Test $((TESTS_RUN + 1)): Health check endpoint"
 ((TESTS_RUN++))

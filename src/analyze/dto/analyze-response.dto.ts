@@ -15,6 +15,7 @@ export class EnhancedAnalysisDto {
   phishing_keywords: string[];
   urls: string[];
   phones: string[];
+  public_ips: string[];
 }
 
 /**
