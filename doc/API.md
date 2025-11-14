@@ -82,7 +82,8 @@ Content-Type: application/json
       "phishing_keywords": [],
       "urls": ["http://example.com", "https://secure.site.com"],
       "phones": ["+12024561111"],
-      "public_ips": ["8.8.8.8", "1.1.1.1"]
+      "public_ips": ["8.8.8.8", "1.1.1.1"],
+      "shortener_used": ["bit.ly", "t.co"]
     }
   }
 }
@@ -104,9 +105,10 @@ Content-Type: application/json
 | analysis.risk_level | number | Risk level (always 0 currently) |
 | analysis.triggers | array | Risk triggers (always empty currently) |
 | analysis.enhanced | object | Enhanced analysis metrics |
-| analysis.enhanced.urls | array | Extracted URLs from content (http://, https://, www., bare domains) |
+| analysis.enhanced.urls | array | Extracted URLs from content (final destinations after following shorteners) |
 | analysis.enhanced.phones | array | Extracted phone numbers in E.164 international format |
 | analysis.enhanced.public_ips | array | Extracted public IP addresses (IPv4 and IPv6, private IPs filtered out) |
+| analysis.enhanced.shortener_used | array | URL shortener domains detected in the content |
 
 **Language Codes:**
 - `eng` - English
@@ -234,6 +236,86 @@ Result: `"public_ips": ["2001:4860:4860::8888"]`
 
 Content: `"No IP addresses in this text"`
 Result: `"public_ips": []`
+
+**URL Shortener Detection and Redirect Following:**
+
+The API automatically detects URL shorteners in the message content, follows redirects to reveal the final destination, and reports both the final URLs and the shortener domains used.
+
+**Detected shortener services (2,300+ domains):**
+- Popular shorteners: `bit.ly`, `t.co`, `tinyurl.com`, `is.gd`, `ow.ly`
+- Branded shorteners: `youtu.be`, `amzn.to`, `goo.gl` (legacy)
+- Comprehensive database powered by `link-shorteners` package
+
+**Redirect following features:**
+- **Maximum 10 redirects** per URL with **2-second timeout** per request
+- Uses HTTP HEAD first (no body download), falls back to GET with Range header (only first byte)
+- **Caches redirect results in Redis for 24 hours** (separate DB index) to avoid redundant resolution
+- Handles relative and absolute redirect URLs
+- Prevents infinite redirect loops with visited URL tracking
+- **Final destination URLs** are included in the `urls` array (not the shortened URLs)
+- **Shortener domains** are listed in the `shortener_used` array
+- Graceful error handling - if redirect fails, returns original URL
+
+**Output format:**
+- `urls`: Array of final destination URLs after following all redirects
+- `shortener_used`: Array of unique shortener domain names detected (deduplicated)
+
+**Examples:**
+
+Content: `"Check this out: https://bit.ly/abc123"`
+(Assuming bit.ly/abc123 redirects to example.com)
+Result:
+```json
+{
+  "urls": ["https://example.com"],
+  "shortener_used": ["bit.ly"]
+}
+```
+
+Content: `"Visit https://bit.ly/link1 or https://t.co/link2"`
+(Assuming redirects to example.com and test.org respectively)
+Result:
+```json
+{
+  "urls": ["https://example.com", "https://test.org"],
+  "shortener_used": ["bit.ly", "t.co"]
+}
+```
+
+Content: `"Check https://bit.ly/abc and also https://bit.ly/xyz"`
+(Both bit.ly links, shortener listed only once)
+Result:
+```json
+{
+  "urls": ["https://example.com", "https://test.org"],
+  "shortener_used": ["bit.ly"]
+}
+```
+
+Content: `"Visit https://example.com and https://bit.ly/abc"`
+(Mix of regular URL and shortener)
+Result:
+```json
+{
+  "urls": ["https://example.com", "https://final-destination.com"],
+  "shortener_used": ["bit.ly"]
+}
+```
+
+Content: `"No shortened links here: https://example.com"`
+Result:
+```json
+{
+  "urls": ["https://example.com"],
+  "shortener_used": []
+}
+```
+
+**Performance considerations:**
+- First request to a shortened URL: ~2-4 seconds (depending on redirect chain)
+- Subsequent requests (within 24h): <50ms (served from Redis cache)
+- Only shortened URLs trigger redirect following; regular URLs are processed instantly
+- Parallel redirect resolution for multiple shorteners in same message
 
 **Error Response (400 Bad Request):**
 ```json

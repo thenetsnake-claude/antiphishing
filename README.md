@@ -6,9 +6,11 @@ NestJS-based content analysis API with language detection and Redis caching.
 
 - **Language Detection**: Automatic language detection using franc library
 - **URL Extraction**: Detects and extracts URLs (http://, https://, www., bare domains) with support for ALL TLDs (1500+)
+- **URL Shortener Detection**: Automatically detects 2,300+ URL shortener services and follows redirects to reveal final destinations
+- **Redirect Following**: Intelligent redirect chain following with caching (max 10 redirects, 2s timeout, 24h cache)
 - **Phone Number Extraction**: Detects and extracts phone numbers in various formats with E.164 normalization
 - **Public IP Detection**: Detects and extracts public IP addresses (IPv4 and IPv6) with private IP filtering
-- **Redis Caching**: High-performance caching with Sentinel support
+- **Redis Caching**: High-performance caching with Sentinel support (multi-database for different cache types)
 - **Health Checks**: Kubernetes-ready health, readiness, and liveness probes
 - **Structured Logging**: JSON logging with daily rotation
 - **Request Validation**: Comprehensive input validation
@@ -79,6 +81,7 @@ Response:
       "urls": [],
       "phones": [],
       "public_ips": [],
+      "shortener_used": [],
       ...
     }
   }
@@ -205,9 +208,11 @@ antiphishing-api/
 - **Framework**: NestJS 10
 - **Runtime**: Node.js 22
 - **Language**: TypeScript 5
-- **Cache**: Redis 7 with ioredis
+- **Cache**: Redis 7 with ioredis (multi-database support)
 - **Language Detection**: franc
 - **URL Detection**: linkify-it with tlds
+- **URL Shortener Detection**: link-shorteners (2,300+ domains)
+- **HTTP Client**: axios (for redirect following)
 - **Phone Number Detection**: libphonenumber-js
 - **Public IP Detection**: ipaddr.js
 - **Validation**: class-validator

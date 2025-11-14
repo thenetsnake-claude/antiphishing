@@ -51,6 +51,11 @@ run_test() {
     ((TESTS_RUN++))
     print_test "Test $TESTS_RUN: $test_name"
 
+    # Display the request
+    echo -e "${BOLD}Request:${NC}"
+    echo "$request_data" | jq '.' 2>/dev/null || echo "$request_data"
+    echo ""
+
     response=$(curl -s -w "\n%{http_code}" -X POST \
         -H "Content-Type: application/json" \
         -d "$request_data" \
@@ -59,20 +64,23 @@ run_test() {
     http_code=$(echo "$response" | tail -n1)
     body=$(echo "$response" | sed '$d')
 
+    # Display the response
+    echo -e "${BOLD}Response (HTTP $http_code):${NC}"
+    echo "$body" | jq '.' 2>/dev/null || echo "$body"
+    echo ""
+
     if [ "$http_code" -eq "$expected_status" ]; then
         if [ -n "$check_response" ]; then
             if echo "$body" | grep -q "$check_response"; then
                 print_success "Status: $http_code (expected), Response contains: $check_response"
             else
                 print_failure "Status: $http_code (expected), but response doesn't contain: $check_response"
-                echo "Response: $body"
             fi
         else
             print_success "Status: $http_code (expected)"
         fi
     else
         print_failure "Status: $http_code (expected: $expected_status)"
-        echo "Response: $body"
     fi
 }
 
@@ -385,6 +393,33 @@ run_test "Public IP detection - no public IPs" 200 '{
   "content": "No IP addresses in this text",
   "messageID": "023e4567-e89b-12d3-a456-426614174012"
 }' '"public_ips":\[\]'
+
+# Test 33: URL shortener detection - bit.ly (Note: requires actual bit.ly redirect or mock)
+run_test "URL shortener - shortener_used field present" 200 '{
+  "parentID": "f23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "023e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "No shortened URLs in this message: https://example.com",
+  "messageID": "123e4567-e89b-12d3-a456-426614174012"
+}' '"shortener_used":\[\]'
+
+# Test 34: URL detection - regular URL not in shortener list
+run_test "URL detection - regular URL" 200 '{
+  "parentID": "223e4567-e89b-12d3-a456-426614174010",
+  "customerID": "323e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Visit https://example.com and www.test.org for more",
+  "messageID": "423e4567-e89b-12d3-a456-426614174012"
+}' '"shortener_used":\[\]'
+
+# Test 35: URL shortener - shortener_used array structure
+run_test "URL shortener - response structure" 200 '{
+  "parentID": "523e4567-e89b-12d3-a456-426614174010",
+  "customerID": "623e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Test message for structure validation",
+  "messageID": "723e4567-e89b-12d3-a456-426614174012"
+}' '"shortener_used":\['
 
 # Test Health Endpoints
 print_test "Test $((TESTS_RUN + 1)): Health check endpoint"

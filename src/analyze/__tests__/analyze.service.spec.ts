@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyzeService } from '../analyze.service';
 import { CacheService } from '../../cache/cache.service';
 import { LanguageService } from '../../language/language.service';
+import { RedirectService } from '../redirect.service';
 import { AnalyzeRequestDto } from '../dto/analyze-request.dto';
 
 // Mock franc module
@@ -23,6 +24,10 @@ describe('AnalyzeService', () => {
     detect: jest.fn(),
   };
 
+  const mockRedirectService = {
+    followRedirects: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -36,6 +41,10 @@ describe('AnalyzeService', () => {
         {
           provide: LanguageService,
           useValue: mockLanguageService,
+        },
+        {
+          provide: RedirectService,
+          useValue: mockRedirectService,
         },
       ],
     }).compile();
@@ -81,6 +90,7 @@ describe('AnalyzeService', () => {
           urls: [],
           phones: [],
           public_ips: [],
+          shortener_used: [],
         },
       };
 
@@ -166,9 +176,13 @@ describe('AnalyzeService', () => {
       expect(enhanced).toHaveProperty('phishing_keywords');
       expect(enhanced).toHaveProperty('urls');
       expect(enhanced).toHaveProperty('phones');
+      expect(enhanced).toHaveProperty('public_ips');
+      expect(enhanced).toHaveProperty('shortener_used');
       expect(Array.isArray(enhanced.phishing_keywords)).toBe(true);
       expect(Array.isArray(enhanced.urls)).toBe(true);
       expect(Array.isArray(enhanced.phones)).toBe(true);
+      expect(Array.isArray(enhanced.public_ips)).toBe(true);
+      expect(Array.isArray(enhanced.shortener_used)).toBe(true);
     });
 
     it('should track processing time', async () => {
@@ -789,6 +803,231 @@ describe('AnalyzeService', () => {
       expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
       expect(result.analysis.enhanced.public_ips).not.toContain('100.64.0.1');
       expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+  });
+
+  describe('URL shortener detection', () => {
+    const createMockRequest = (content: string): AnalyzeRequestDto => ({
+      parentID: '123e4567-e89b-12d3-a456-426614174000',
+      customerID: '223e4567-e89b-12d3-a456-426614174001',
+      senderID: 'test@example.com',
+      messageID: '323e4567-e89b-12d3-a456-426614174002',
+      content,
+    });
+
+    beforeEach(() => {
+      mockCacheService.get.mockResolvedValue(null);
+      mockLanguageService.detect.mockReturnValue({
+        language: 'eng',
+        confidence: 95,
+      });
+    });
+
+    it('should detect bit.ly shortener and follow redirect', async () => {
+      const shortUrl = 'https://bit.ly/abc123';
+      const finalUrl = 'https://example.com';
+
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl,
+        redirectCount: 1,
+      });
+
+      const request = createMockRequest(`Check this link: ${shortUrl}`);
+      const result = await service.analyze(request);
+
+      expect(mockRedirectService.followRedirects).toHaveBeenCalledWith(shortUrl);
+      expect(result.analysis.enhanced.urls).toContain(finalUrl);
+      expect(result.analysis.enhanced.urls).not.toContain(shortUrl);
+      expect(result.analysis.enhanced.shortener_used).toContain('bit.ly');
+    });
+
+    it('should detect t.co shortener and follow redirect', async () => {
+      const shortUrl = 'https://t.co/abc123xyz';
+      const finalUrl = 'https://example.com/article';
+
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl,
+        redirectCount: 2,
+      });
+
+      const request = createMockRequest(`Twitter link: ${shortUrl}`);
+      const result = await service.analyze(request);
+
+      expect(mockRedirectService.followRedirects).toHaveBeenCalledWith(shortUrl);
+      expect(result.analysis.enhanced.urls).toContain(finalUrl);
+      expect(result.analysis.enhanced.shortener_used).toContain('t.co');
+    });
+
+    it('should detect tinyurl.com shortener', async () => {
+      const shortUrl = 'https://tinyurl.com/abc123';
+      const finalUrl = 'https://example.com';
+
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl,
+        redirectCount: 1,
+      });
+
+      const request = createMockRequest(`Visit ${shortUrl}`);
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.shortener_used).toContain('tinyurl.com');
+      expect(result.analysis.enhanced.urls).toContain(finalUrl);
+    });
+
+    it('should handle multiple shorteners in same content', async () => {
+      const shortUrl1 = 'https://bit.ly/abc123';
+      const shortUrl2 = 'https://t.co/xyz789';
+      const finalUrl1 = 'https://example.com';
+      const finalUrl2 = 'https://test.org';
+
+      mockRedirectService.followRedirects
+        .mockResolvedValueOnce({ finalUrl: finalUrl1, redirectCount: 1 })
+        .mockResolvedValueOnce({ finalUrl: finalUrl2, redirectCount: 1 });
+
+      const request = createMockRequest(`Check ${shortUrl1} and ${shortUrl2}`);
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.urls).toContain(finalUrl1);
+      expect(result.analysis.enhanced.urls).toContain(finalUrl2);
+      expect(result.analysis.enhanced.shortener_used).toContain('bit.ly');
+      expect(result.analysis.enhanced.shortener_used).toContain('t.co');
+    });
+
+    it('should handle mix of shortened and regular URLs', async () => {
+      const shortUrl = 'https://bit.ly/abc123';
+      const regularUrl = 'https://example.com';
+      const finalUrl = 'https://redirect-destination.com';
+
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl,
+        redirectCount: 1,
+      });
+
+      const request = createMockRequest(`Visit ${shortUrl} or ${regularUrl}`);
+      const result = await service.analyze(request);
+
+      // Short URL should be followed
+      expect(mockRedirectService.followRedirects).toHaveBeenCalledWith(shortUrl);
+      expect(result.analysis.enhanced.urls).toContain(finalUrl);
+
+      // Regular URL should not be followed
+      expect(mockRedirectService.followRedirects).not.toHaveBeenCalledWith(regularUrl);
+      expect(result.analysis.enhanced.urls).toContain(regularUrl);
+
+      // Only shortener should be in shortener_used
+      expect(result.analysis.enhanced.shortener_used).toContain('bit.ly');
+      expect(result.analysis.enhanced.shortener_used.length).toBe(1);
+    });
+
+    it('should not list shorteners when no shorteners present', async () => {
+      const request = createMockRequest('Visit https://example.com for info');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.shortener_used).toEqual([]);
+      expect(mockRedirectService.followRedirects).not.toHaveBeenCalled();
+    });
+
+    it('should deduplicate shorteners when same shortener used multiple times', async () => {
+      const shortUrl1 = 'https://bit.ly/abc123';
+      const shortUrl2 = 'https://bit.ly/xyz789';
+      const finalUrl1 = 'https://example.com';
+      const finalUrl2 = 'https://test.org';
+
+      mockRedirectService.followRedirects
+        .mockResolvedValueOnce({ finalUrl: finalUrl1, redirectCount: 1 })
+        .mockResolvedValueOnce({ finalUrl: finalUrl2, redirectCount: 1 });
+
+      const request = createMockRequest(`Check ${shortUrl1} and ${shortUrl2}`);
+      const result = await service.analyze(request);
+
+      // Should list bit.ly only once
+      expect(result.analysis.enhanced.shortener_used).toEqual(['bit.ly']);
+      expect(result.analysis.enhanced.urls).toContain(finalUrl1);
+      expect(result.analysis.enhanced.urls).toContain(finalUrl2);
+    });
+
+    it('should handle shortener with www subdomain', async () => {
+      const shortUrl = 'https://www.bit.ly/abc123';
+      const finalUrl = 'https://example.com';
+
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl,
+        redirectCount: 1,
+      });
+
+      const request = createMockRequest(`Link: ${shortUrl}`);
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.shortener_used).toContain('www.bit.ly');
+      expect(result.analysis.enhanced.urls).toContain(finalUrl);
+    });
+
+    it('should handle shorteners without protocol', async () => {
+      const shortUrl = 'bit.ly/abc123';
+      const finalUrl = 'https://example.com';
+
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl,
+        redirectCount: 1,
+      });
+
+      const request = createMockRequest(`Visit ${shortUrl}`);
+      const result = await service.analyze(request);
+
+      // linkify will add http:// protocol
+      expect(mockRedirectService.followRedirects).toHaveBeenCalledWith('http://bit.ly/abc123');
+      expect(result.analysis.enhanced.shortener_used).toContain('bit.ly');
+      expect(result.analysis.enhanced.urls).toContain(finalUrl);
+    });
+
+    it('should handle redirect service failures gracefully', async () => {
+      const shortUrl = 'https://bit.ly/abc123';
+
+      // Redirect service returns original URL on failure
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl: shortUrl,
+        redirectCount: 0,
+      });
+
+      const request = createMockRequest(`Check ${shortUrl}`);
+      const result = await service.analyze(request);
+
+      // Should still include the shortener domain
+      expect(result.analysis.enhanced.shortener_used).toContain('bit.ly');
+      // Original URL should be in URLs if redirect fails
+      expect(result.analysis.enhanced.urls).toContain(shortUrl);
+    });
+
+    it('should detect is.gd shortener', async () => {
+      const shortUrl = 'https://is.gd/abc123';
+      const finalUrl = 'https://example.com';
+
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl,
+        redirectCount: 1,
+      });
+
+      const request = createMockRequest(`Click ${shortUrl}`);
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.shortener_used).toContain('is.gd');
+      expect(result.analysis.enhanced.urls).toContain(finalUrl);
+    });
+
+    it('should detect ow.ly shortener', async () => {
+      const shortUrl = 'https://ow.ly/abc123';
+      const finalUrl = 'https://example.com';
+
+      mockRedirectService.followRedirects.mockResolvedValue({
+        finalUrl,
+        redirectCount: 1,
+      });
+
+      const request = createMockRequest(`See ${shortUrl}`);
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.shortener_used).toContain('ow.ly');
+      expect(result.analysis.enhanced.urls).toContain(finalUrl);
     });
   });
 });

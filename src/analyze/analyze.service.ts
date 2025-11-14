@@ -5,8 +5,10 @@ import LinkifyIt = require('linkify-it');
 import tlds = require('tlds');
 import { findPhoneNumbersInText, PhoneNumber } from 'libphonenumber-js';
 import * as ipaddr from 'ipaddr.js';
+import * as linkShorteners from 'link-shorteners';
 import { CacheService } from '../cache/cache.service';
 import { LanguageService } from '../language/language.service';
+import { RedirectService } from './redirect.service';
 import { AnalyzeRequestDto } from './dto/analyze-request.dto';
 import { AnalyzeResponseDto, AnalysisDto, EnhancedAnalysisDto } from './dto/analyze-response.dto';
 
@@ -19,15 +21,21 @@ export class AnalyzeService {
   private readonly logger = new Logger(AnalyzeService.name);
   private readonly CACHE_TTL = 60; // 60 seconds
   private readonly linkify: LinkifyIt;
+  private readonly shortenerDomains: string[];
 
   constructor(
     private readonly cacheService: CacheService,
     private readonly languageService: LanguageService,
+    private readonly redirectService: RedirectService,
   ) {
     // Initialize linkify-it with all TLDs and fuzzy matching for domains without protocol
     this.linkify = new LinkifyIt();
     this.linkify.tlds(tlds); // Add all known TLDs (1500+)
     this.linkify.set({ fuzzyLink: true, fuzzyEmail: false });
+
+    // Load list of known shortener domains
+    this.shortenerDomains = linkShorteners.listLinkShorterners();
+    this.logger.log(`Loaded ${this.shortenerDomains.length} known URL shortener domains`);
   }
 
   /**
@@ -56,7 +64,7 @@ export class AnalyzeService {
     const languageResult = this.languageService.detect(request.content);
 
     // Build analysis result
-    const analysis = this.buildAnalysis(
+    const analysis = await this.buildAnalysis(
       languageResult,
       false,
       Date.now() - startTime,
@@ -77,12 +85,12 @@ export class AnalyzeService {
   /**
    * Build analysis object from language detection result
    */
-  private buildAnalysis(
+  private async buildAnalysis(
     languageResult: { language: string; confidence: number },
     cached: boolean,
     processingTime: number,
     content: string,
-  ): AnalysisDto {
+  ): Promise<AnalysisDto> {
     return {
       language: languageResult.language,
       lang_certainity: languageResult.confidence,
@@ -90,14 +98,17 @@ export class AnalyzeService {
       processing_time_ms: processingTime,
       risk_level: 0,
       triggers: [],
-      enhanced: this.buildEnhancedAnalysis(content),
+      enhanced: await this.buildEnhancedAnalysis(content),
     };
   }
 
   /**
    * Build enhanced analysis with URL detection, phone detection, and public IP detection
+   * Detects URL shorteners and follows redirects to get final destinations
    */
-  private buildEnhancedAnalysis(content: string): EnhancedAnalysisDto {
+  private async buildEnhancedAnalysis(content: string): Promise<EnhancedAnalysisDto> {
+    const urlResult = await this.extractUrls(content);
+
     return {
       keyword_density: 0,
       message_length_risk: 0,
@@ -110,26 +121,33 @@ export class AnalyzeService {
       total_temporal_risk: 0,
       suspicious_tld: '',
       phishing_keywords: [],
-      urls: this.extractUrls(content),
+      urls: urlResult.urls,
       phones: this.extractPhones(content),
       public_ips: this.extractPublicIPs(content),
+      shortener_used: urlResult.shorteners,
     };
   }
 
   /**
    * Extract URLs from content using linkify-it library
+   * Detects URL shorteners and follows redirects to get final URLs
    * Supports all TLDs and properly handles URLs with/without protocols
    */
-  private extractUrls(content: string): string[] {
+  private async extractUrls(
+    content: string,
+  ): Promise<{ urls: string[]; shorteners: string[] }> {
     // Use linkify-it to find all URLs (supports all TLDs automatically)
     const matches = this.linkify.match(content);
 
     if (!matches) {
-      return [];
+      return { urls: [], shorteners: [] };
     }
 
-    // Extract and normalize URLs
-    const urls: string[] = matches.map((match: LinkifyIt.Match) => {
+    const finalUrls: string[] = [];
+    const shortenerDomains = new Set<string>();
+
+    // Process each URL
+    for (const match of matches) {
       let url = match.url;
 
       // Ensure protocol is present
@@ -137,11 +155,43 @@ export class AnalyzeService {
         url = `http://${url}`;
       }
 
-      return url;
-    });
+      try {
+        // Extract hostname from URL
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname;
 
-    // Remove duplicates and return
-    return [...new Set(urls)];
+        // Check if this is a known shortener
+        const isShortener = this.shortenerDomains.some((shortener: string) => {
+          return hostname === shortener || hostname.endsWith(`.${shortener}`);
+        });
+
+        if (isShortener) {
+          // This is a shortener, follow redirects
+          this.logger.debug(`Detected shortener: ${hostname} for URL: ${url}`);
+          shortenerDomains.add(hostname);
+
+          const redirectResult = await this.redirectService.followRedirects(url);
+          finalUrls.push(redirectResult.finalUrl);
+
+          this.logger.debug(
+            `Followed ${redirectResult.redirectCount} redirects: ${url} -> ${redirectResult.finalUrl}`,
+          );
+        } else {
+          // Not a shortener, use as-is
+          finalUrls.push(url);
+        }
+      } catch (error) {
+        // If URL parsing fails, use original URL
+        this.logger.warn(`Failed to process URL ${url}: ${error.message}`);
+        finalUrls.push(url);
+      }
+    }
+
+    // Remove duplicates from final URLs
+    return {
+      urls: [...new Set(finalUrls)],
+      shorteners: [...shortenerDomains],
+    };
   }
 
   /**

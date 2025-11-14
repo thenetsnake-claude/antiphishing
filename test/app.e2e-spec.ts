@@ -466,6 +466,88 @@ describe('Antiphishing API (e2e)', () => {
       });
     });
 
+    describe('URL Shortener Detection', () => {
+      it('should include shortener_used field in response', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit https://example.com for more info',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced).toHaveProperty('shortener_used');
+            expect(Array.isArray(res.body.analysis.enhanced.shortener_used)).toBe(true);
+          });
+      });
+
+      it('should return empty shortener_used array for regular URLs', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit https://example.com and www.test.org today',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.shortener_used).toEqual([]);
+            expect(res.body.analysis.enhanced.urls).toContain('https://example.com');
+            expect(res.body.analysis.enhanced.urls).toContain('http://www.test.org');
+          });
+      });
+
+      it('should return empty shortener_used array when no URLs present', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'This message has no URLs at all',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.shortener_used).toEqual([]);
+            expect(res.body.analysis.enhanced.urls).toEqual([]);
+          });
+      });
+
+      it('should handle content with mixed URL types', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit https://example.com, www.test.org, and example.net',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.shortener_used).toEqual([]);
+            expect(res.body.analysis.enhanced.urls.length).toBeGreaterThanOrEqual(3);
+          });
+      });
+
+      // Note: Real shortener testing would require actual shortened URLs or mocking
+      // These tests verify the structure and behavior for regular URLs
+      it('should have correct structure for enhanced analysis', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Test message with various content',
+          })
+          .expect(200)
+          .expect((res) => {
+            const enhanced = res.body.analysis.enhanced;
+            expect(enhanced).toHaveProperty('urls');
+            expect(enhanced).toHaveProperty('phones');
+            expect(enhanced).toHaveProperty('public_ips');
+            expect(enhanced).toHaveProperty('shortener_used');
+            expect(Array.isArray(enhanced.urls)).toBe(true);
+            expect(Array.isArray(enhanced.phones)).toBe(true);
+            expect(Array.isArray(enhanced.public_ips)).toBe(true);
+            expect(Array.isArray(enhanced.shortener_used)).toBe(true);
+          });
+      });
+    });
+
     describe('Validation', () => {
       it('should return 400 for missing parentID', () => {
         const invalidRequest = { ...validRequest } as Record<string, unknown>;

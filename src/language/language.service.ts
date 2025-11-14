@@ -42,12 +42,14 @@ export class LanguageService {
 
       const [detectedLang, score] = results[0];
 
-      // Convert franc's score (0-1) to percentage
-      // franc returns lower scores for higher confidence (distance metric)
-      // We invert and normalize it
-      const confidence = Math.round((1 - score) * 100);
+      // Convert franc's score (distance metric) to confidence percentage
+      // franc returns lower scores for better matches (distance from language model)
+      // Typical ranges: 0-0.5 = excellent, 0.5-1.0 = good, > 1.0 = poor
+      // We convert to 0-100 percentage (higher is better)
+      const rawConfidence = (1 - score) * 100;
+      const confidence = Math.max(0, Math.min(100, Math.round(rawConfidence)));
 
-      this.logger.debug(`Detected language: ${detectedLang} with confidence: ${confidence}%`);
+      this.logger.debug(`Detected language: ${detectedLang} with confidence: ${confidence}% (score: ${score})`);
 
       return {
         language: detectedLang,
