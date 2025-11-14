@@ -81,7 +81,7 @@ Content-Type: application/json
       "suspicious_tld": "",
       "phishing_keywords": [],
       "urls": ["http://example.com", "https://secure.site.com"],
-      "phones": []
+      "phones": ["+12024561111"]
     }
   }
 }
@@ -103,7 +103,8 @@ Content-Type: application/json
 | analysis.risk_level | number | Risk level (always 0 currently) |
 | analysis.triggers | array | Risk triggers (always empty currently) |
 | analysis.enhanced | object | Enhanced analysis metrics |
-| analysis.enhanced.urls | array | Extracted URLs from content (http://, https://, www.) |
+| analysis.enhanced.urls | array | Extracted URLs from content (http://, https://, www., bare domains) |
+| analysis.enhanced.phones | array | Extracted phone numbers in E.164 international format |
 
 **Language Codes:**
 - `eng` - English
@@ -143,6 +144,43 @@ Result: `"urls": ["http://example.com", "http://test.org", "http://demo.net"]`
 
 Content: `"Contact support@example.com for help"`
 Result: `"urls": []` (email addresses are not detected as URLs)
+
+**Phone Number Detection:**
+
+The API automatically extracts phone numbers from the message content and includes them in the `analysis.enhanced.phones` array.
+
+**Detected phone number formats:**
+- International format with country code: `+1 (202) 456-1111`, `+44-20-7946-0958`
+- Various separators supported:
+  - **Dashes**: `+1-202-456-1111`
+  - **Dots**: `+1.202.456.1111`
+  - **Spaces**: `+1 202 456 1111`
+  - **Parentheses**: `+1 (202) 456-1111`, `+1(202)456-1111`
+  - **Slashes**: `+33/1/42/86/82/00` (may not always be detected)
+- Mixed formats in same content
+
+**Phone number extraction features:**
+- **Output format**: E.164 international format (e.g., `+12024561111`)
+- Powered by `libphonenumber-js` library for comprehensive international support
+- Supports phone numbers from all countries and regions
+- Handles various local and international formatting styles
+- Automatically deduplicates identical numbers
+- Returns empty array `[]` when no phone numbers are present
+- Graceful error handling - never fails the request
+
+**Examples:**
+
+Content: `"Call us at +1-202-456-1111 for support"`
+Result: `"phones": ["+12024561111"]`
+
+Content: `"Phone: +44-20-7946-0958 or +1.202.456.1111"`
+Result: `"phones": ["+442079460958", "+12024561111"]`
+
+Content: `"Contact +1 (202) 456-1111 and also +1-202-456-1111"`
+Result: `"phones": ["+12024561111"]` (deduplicated)
+
+Content: `"No phone numbers in this text"`
+Result: `"phones": []`
 
 **Error Response (400 Bad Request):**
 ```json

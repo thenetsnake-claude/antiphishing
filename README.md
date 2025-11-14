@@ -6,6 +6,7 @@ NestJS-based content analysis API with language detection and Redis caching.
 
 - **Language Detection**: Automatic language detection using franc library
 - **URL Extraction**: Detects and extracts URLs (http://, https://, www., bare domains) with support for ALL TLDs (1500+)
+- **Phone Number Extraction**: Detects and extracts phone numbers in various formats with E.164 normalization
 - **Redis Caching**: High-performance caching with Sentinel support
 - **Health Checks**: Kubernetes-ready health, readiness, and liveness probes
 - **Structured Logging**: JSON logging with daily rotation
@@ -44,7 +45,7 @@ npm run start:dev
 
 **POST /analyze**
 
-Analyzes message content, detects language, and extracts URLs.
+Analyzes message content, detects language, and extracts URLs and phone numbers.
 
 Request:
 ```json
@@ -75,6 +76,7 @@ Response:
       "keyword_density": 0,
       "message_length_risk": 0,
       "urls": [],
+      "phones": [],
       ...
     }
   }
@@ -203,6 +205,8 @@ antiphishing-api/
 - **Language**: TypeScript 5
 - **Cache**: Redis 7 with ioredis
 - **Language Detection**: franc
+- **URL Detection**: linkify-it with tlds
+- **Phone Number Detection**: libphonenumber-js
 - **Validation**: class-validator
 - **Logging**: Winston with daily rotation
 - **Testing**: Jest

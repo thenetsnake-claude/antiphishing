@@ -9,6 +9,7 @@ Build a NestJS-based content analysis API that detects language from incoming me
 - **Node.js Version**: 22
 - **Language Detection**: franc library
 - **URL Detection**: linkify-it library with tlds package
+- **Phone Number Detection**: libphonenumber-js library
 - **Cache**: Redis (with Sentinel support for production)
 - **Test Coverage**: Minimum 75%
 
@@ -176,6 +177,69 @@ The API automatically extracts and normalizes URLs from message content and retu
 - Never fail the request due to URL detection issues
 - Gracefully handle malformed content
 
+## Phone Number Detection
+
+### Overview
+The API automatically extracts and normalizes phone numbers from message content and returns them in the `analysis.enhanced.phones` array.
+
+### Library
+- Use `libphonenumber-js` library (v1.12.26) for phone number detection
+- Comprehensive international phone number parsing library
+- Based on Google's libphonenumber library
+- Supports phone numbers from all countries and regions
+
+### Supported Phone Number Formats
+1. **International format with country code**
+   - `+1 (202) 456-1111` (US format with parentheses)
+   - `+44-20-7946-0958` (UK format with dashes)
+   - `+49 30 12345678` (German format with spaces)
+   - `+81-3-1234-5678` (Japanese format)
+
+2. **Various separators supported**
+   - **Dashes**: `+1-202-456-1111`
+   - **Dots**: `+1.202.456.1111`
+   - **Spaces**: `+1 202 456 1111`
+   - **Parentheses**: `+1 (202) 456-1111`, `+1(202)456-1111`
+   - **Slashes**: `+33/1/42/86/82/00` (less common, may not always be detected)
+
+3. **Mixed formats in same content**
+   - Multiple phone numbers with different separators can be detected in the same message
+
+### Output Format
+- **E.164 International Format**: All phone numbers returned as E.164 strings
+  - Example: `+12024561111` (no spaces, dashes, or parentheses)
+  - Always includes country code prefix with `+`
+  - Consistent format regardless of input format
+  - Easy to store and compare
+
+### Phone Number Extraction Features
+- Detects phone numbers in various local and international formatting styles
+- Automatically normalizes all phone numbers to E.164 format
+- Supports phone numbers from all countries and regions worldwide
+- Handles multiple phone numbers in single message
+- Automatically deduplicates identical phone numbers
+- Returns empty array `[]` when no phone numbers found
+- Case-insensitive detection
+- Strips surrounding text and punctuation
+
+### Technical Implementation
+- Uses `findPhoneNumbersInText()` function for broad detection
+- No country hint provided to maximize detection coverage
+- Converts PhoneNumber objects to E.164 string format
+- TypeScript type safety with PhoneNumber interface
+- Duplicate removal using Set data structure
+
+### Failure Handling
+- If phone number extraction fails: return empty array `[]`
+- Never fail the request due to phone detection issues
+- Gracefully handle malformed phone numbers
+- Invalid phone-like text is filtered out
+
+### Privacy Considerations
+- Only extracts phone numbers, does not validate ownership
+- No storage or retention of phone numbers beyond response
+- Phone numbers logged in response metadata only
+
 ## Health Checks
 
 ### Required Endpoints
@@ -226,6 +290,7 @@ Health checks should verify:
 - Tests for Redis caching (with mocked Redis)
 - Tests for language detection
 - Tests for URL detection
+- Tests for phone number detection
 - Tests for validation rules
 
 ### Test Scenarios (cURL)
@@ -244,6 +309,11 @@ Create a script with test scenarios for:
 - URL detection with www prefix
 - URL detection with bare domains
 - URL detection should not detect emails
+- Phone detection with dashes
+- Phone detection with dots
+- Phone detection with parentheses
+- Phone detection with multiple numbers
+- Phone detection should return empty array when no phones
 
 ## Validation Rules
 
@@ -384,16 +454,18 @@ antiphishing-api/
 
 1. **Language Detection Library**: franc
 2. **URL Detection Library**: linkify-it with tlds package for universal TLD support
-3. **Cache Key Strategy**: Only content field
-4. **Language Detection Failure**: Return "unknown" with confidence in lang_certainity
-5. **URL Detection Failure**: Return empty array []
-6. **Error Response Format**: Standard NestJS format
-7. **Node.js Version**: 22
-8. **Redis Env Vars**: REDIS_SENTINEL_HOSTS, REDIS_PASSWORD, REDIS_USERNAME, REDIS_TLS_ENABLED, REDIS_MASTER_NAME
-9. **Additional Endpoints**: health, readiness, liveness
-10. **Logging**: Log all except content, JSON to file (daily rotation) + console for dev
-11. **Project Name**: antiphishing-api
-12. **Status Codes**: 200 OK, 400 Bad Request, continue without cache if Redis down
+3. **Phone Number Detection Library**: libphonenumber-js with E.164 output format
+4. **Cache Key Strategy**: Only content field
+5. **Language Detection Failure**: Return "unknown" with confidence in lang_certainity
+6. **URL Detection Failure**: Return empty array []
+7. **Phone Detection Failure**: Return empty array []
+8. **Error Response Format**: Standard NestJS format
+9. **Node.js Version**: 22
+10. **Redis Env Vars**: REDIS_SENTINEL_HOSTS, REDIS_PASSWORD, REDIS_USERNAME, REDIS_TLS_ENABLED, REDIS_MASTER_NAME
+11. **Additional Endpoints**: health, readiness, liveness
+12. **Logging**: Log all except content, JSON to file (daily rotation) + console for dev
+13. **Project Name**: antiphishing-api
+14. **Status Codes**: 200 OK, 400 Bad Request, continue without cache if Redis down
 
 ## Implemented Features
 
@@ -405,6 +477,16 @@ antiphishing-api/
 - Normalizes URLs and removes duplicates
 - Returns extracted URLs in `analysis.enhanced.urls` array
 - Comprehensive test coverage: 29 unit tests, 4 E2E tests, 4 cURL scenarios
+
+### Phone Number Detection (Added)
+- Automatically extracts phone numbers from message content
+- Supports international format with country codes
+- Handles various separators: dashes, dots, spaces, parentheses, slashes
+- Normalizes all phone numbers to E.164 international format
+- Supports phone numbers from all countries and regions worldwide
+- Automatically deduplicates identical phone numbers
+- Returns extracted phone numbers in `analysis.enhanced.phones` array
+- Comprehensive test coverage: 15 unit tests, 4 E2E tests
 
 ## Notes
 - All placeholder values (status: "safe", certainity: 0, etc.) are hardcoded for now

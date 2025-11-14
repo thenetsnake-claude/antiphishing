@@ -278,6 +278,51 @@ run_test "URL detection - email not detected" 200 '{
   "messageID": "e23e4567-e89b-12d3-a456-426614174002"
 }' '"urls":\[\]'
 
+# Test 21: Phone detection - phone with dashes
+run_test "Phone detection - phone with dashes" 200 '{
+  "parentID": "f23e4567-e89b-12d3-a456-426614174000",
+  "customerID": "023e4567-e89b-12d3-a456-426614174001",
+  "senderID": "test@example.com",
+  "content": "Call us at +1-202-456-1111 for support",
+  "messageID": "123e4567-e89b-12d3-a456-426614174002"
+}' '"phones":\["+12024561111"\]'
+
+# Test 22: Phone detection - phone with dots
+run_test "Phone detection - phone with dots" 200 '{
+  "parentID": "023e4567-e89b-12d3-a456-426614174010",
+  "customerID": "123e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Contact +1.202.456.1111 today",
+  "messageID": "223e4567-e89b-12d3-a456-426614174012"
+}' '"phones":\["+12024561111"\]'
+
+# Test 23: Phone detection - phone with parentheses
+run_test "Phone detection - phone with parentheses" 200 '{
+  "parentID": "323e4567-e89b-12d3-a456-426614174010",
+  "customerID": "423e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Phone: +1 (202) 456-1111 for assistance",
+  "messageID": "523e4567-e89b-12d3-a456-426614174012"
+}' '"phones":\["+12024561111"\]'
+
+# Test 24: Phone detection - multiple phone numbers
+run_test "Phone detection - multiple phone numbers" 200 '{
+  "parentID": "623e4567-e89b-12d3-a456-426614174010",
+  "customerID": "723e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Call +1-202-456-1111 or +44-20-7946-0958",
+  "messageID": "823e4567-e89b-12d3-a456-426614174012"
+}' '"phones":\['
+
+# Test 25: Phone detection - no phones
+run_test "Phone detection - no phones" 200 '{
+  "parentID": "923e4567-e89b-12d3-a456-426614174010",
+  "customerID": "a23e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "This message has no phone numbers at all",
+  "messageID": "b23e4567-e89b-12d3-a456-426614174012"
+}' '"phones":\[\]'
+
 # Test Health Endpoints
 print_test "Test $((TESTS_RUN + 1)): Health check endpoint"
 ((TESTS_RUN++))
