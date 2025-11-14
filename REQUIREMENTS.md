@@ -213,6 +213,7 @@ The API automatically extracts and normalizes phone numbers from message content
   - Easy to store and compare
 
 ### Phone Number Extraction Features
+- **Default Country**: Belgium (BE) - local Belgian numbers detected without country code
 - Detects phone numbers in various local and international formatting styles
 - Automatically normalizes all phone numbers to E.164 format
 - Supports phone numbers from all countries and regions worldwide
@@ -221,10 +222,14 @@ The API automatically extracts and normalizes phone numbers from message content
 - Returns empty array `[]` when no phone numbers found
 - Case-insensitive detection
 - Strips surrounding text and punctuation
+- Examples of Belgian local formats:
+  - Toll-free: `0800 33 800` → `+32800338 00`
+  - Brussels landline: `02 123 45 67` → `+3221234567`
+  - Mobile: `0470 12 34 56` → `+32470123456`
 
 ### Technical Implementation
 - Uses `findPhoneNumbersInText()` function for broad detection
-- No country hint provided to maximize detection coverage
+- Belgium (BE) provided as default country for local number detection
 - Converts PhoneNumber objects to E.164 string format
 - TypeScript type safety with PhoneNumber interface
 - Duplicate removal using Set data structure
@@ -314,6 +319,9 @@ Create a script with test scenarios for:
 - Phone detection with parentheses
 - Phone detection with multiple numbers
 - Phone detection should return empty array when no phones
+- Phone detection with Belgian toll-free number
+- Phone detection with Belgian landline
+- Phone detection with Belgian mobile
 
 ## Validation Rules
 
@@ -480,13 +488,15 @@ antiphishing-api/
 
 ### Phone Number Detection (Added)
 - Automatically extracts phone numbers from message content
+- **Default country**: Belgium (BE) for local number detection
+- Supports Belgian local formats: toll-free (0800), landlines (02, 03, etc.), mobile (047x, 048x, 049x)
 - Supports international format with country codes
 - Handles various separators: dashes, dots, spaces, parentheses, slashes
 - Normalizes all phone numbers to E.164 international format
 - Supports phone numbers from all countries and regions worldwide
 - Automatically deduplicates identical phone numbers
 - Returns extracted phone numbers in `analysis.enhanced.phones` array
-- Comprehensive test coverage: 15 unit tests, 4 E2E tests
+- Comprehensive test coverage: 20 unit tests, 7 E2E tests, 8 cURL scenarios
 
 ## Notes
 - All placeholder values (status: "safe", certainity: 0, etc.) are hardcoded for now

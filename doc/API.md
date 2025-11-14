@@ -150,6 +150,7 @@ Result: `"urls": []` (email addresses are not detected as URLs)
 The API automatically extracts phone numbers from the message content and includes them in the `analysis.enhanced.phones` array.
 
 **Detected phone number formats:**
+- **Belgian local numbers** (default country: BE): `0800 33 800`, `02 123 45 67`, `0470 12 34 56`
 - International format with country code: `+1 (202) 456-1111`, `+44-20-7946-0958`
 - Various separators supported:
   - **Dashes**: `+1-202-456-1111`
@@ -181,6 +182,12 @@ Result: `"phones": ["+12024561111"]` (deduplicated)
 
 Content: `"No phone numbers in this text"`
 Result: `"phones": []`
+
+Content: `"Call our helpline at 0800 33 800"` (Belgian toll-free number)
+Result: `"phones": ["+32800338 00"]`
+
+Content: `"Our office: 02 123 45 67, Mobile: 0470 12 34 56"` (Belgian landline and mobile)
+Result: `"phones": ["+3221234567", "+32470123456"]`
 
 **Error Response (400 Bad Request):**
 ```json

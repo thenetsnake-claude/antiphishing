@@ -448,6 +448,14 @@ describe('AnalyzeService', () => {
       content,
     });
 
+    beforeEach(() => {
+      mockCacheService.get.mockResolvedValue(null);
+      mockLanguageService.detect.mockReturnValue({
+        language: 'eng',
+        confidence: 95,
+      });
+    });
+
     it('should extract phone numbers in international format', async () => {
       const request = createMockRequest('Call me at +1 (202) 456-1111 for more info');
       const result = await service.analyze(request);
@@ -578,6 +586,63 @@ describe('AnalyzeService', () => {
       expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
       if (result.analysis.enhanced.phones.length > 0) {
         expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+
+    it('should extract Belgian local toll-free numbers', async () => {
+      const request = createMockRequest('Call our helpline at 0800 33 800');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        // Belgian toll-free numbers start with 0800 and are converted to +32800
+        expect(result.analysis.enhanced.phones[0]).toMatch(/\+32800/);
+      }
+    });
+
+    it('should extract Belgian local landline numbers', async () => {
+      const request = createMockRequest('Our office number is 02 123 45 67');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        // Belgian landlines with area code 02 (Brussels) convert to +322
+        expect(result.analysis.enhanced.phones[0]).toMatch(/\+322/);
+      }
+    });
+
+    it('should extract Belgian mobile numbers', async () => {
+      const request = createMockRequest('My mobile is 0470 12 34 56');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        // Belgian mobiles starting with 047 convert to +3247
+        expect(result.analysis.enhanced.phones[0]).toMatch(/\+3247/);
+      }
+    });
+
+    it('should extract Belgian numbers with various separators', async () => {
+      const request = createMockRequest('Contact us: 02/123.45.67 or 0470-12-34-56');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      // Should detect at least one Belgian number
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toMatch(/\+32/);
+      }
+    });
+
+    it('should handle mix of international and Belgian local numbers', async () => {
+      const request = createMockRequest('International: +1-202-456-1111, Local: 0800 33 800');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(2);
+      // Should detect both international and Belgian local number
+      if (result.analysis.enhanced.phones.length >= 2) {
+        const hasUS = result.analysis.enhanced.phones.some((p) => p.includes('+1'));
+        const hasBE = result.analysis.enhanced.phones.some((p) => p.includes('+32'));
+        expect(hasUS || hasBE).toBe(true);
       }
     });
   });

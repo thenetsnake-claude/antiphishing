@@ -323,6 +323,33 @@ run_test "Phone detection - no phones" 200 '{
   "messageID": "b23e4567-e89b-12d3-a456-426614174012"
 }' '"phones":\[\]'
 
+# Test 26: Phone detection - Belgian local toll-free number
+run_test "Phone detection - Belgian local toll-free" 200 '{
+  "parentID": "c23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "d23e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Call our helpline at 0800 33 800",
+  "messageID": "e23e4567-e89b-12d3-a456-426614174012"
+}' '"+32800'
+
+# Test 27: Phone detection - Belgian local landline
+run_test "Phone detection - Belgian local landline" 200 '{
+  "parentID": "f23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "023e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Our office number is 02 123 45 67",
+  "messageID": "123e4567-e89b-12d3-a456-426614174012"
+}' '"+322'
+
+# Test 28: Phone detection - Belgian mobile number
+run_test "Phone detection - Belgian mobile" 200 '{
+  "parentID": "223e4567-e89b-12d3-a456-426614174010",
+  "customerID": "323e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "My mobile is 0470 12 34 56",
+  "messageID": "423e4567-e89b-12d3-a456-426614174012"
+}' '"+3247'
+
 # Test Health Endpoints
 print_test "Test $((TESTS_RUN + 1)): Health check endpoint"
 ((TESTS_RUN++))

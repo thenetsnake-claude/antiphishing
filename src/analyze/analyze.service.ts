@@ -145,11 +145,13 @@ export class AnalyzeService {
   /**
    * Extract phone numbers from content using libphonenumber-js
    * Handles various formats: international, local, with separators (. / ( ) -)
+   * Uses Belgium (BE) as default country for local number detection
    */
   private extractPhones(content: string): string[] {
     try {
-      // Find all phone numbers in text (without country hint for broader detection)
-      const phoneNumbers = findPhoneNumbersInText(content);
+      // Find all phone numbers in text with Belgium as default country
+      // This allows detection of local Belgian numbers like "0800 33 800"
+      const phoneNumbers = findPhoneNumbersInText(content, 'BE');
 
       if (!phoneNumbers || phoneNumbers.length === 0) {
         return [];

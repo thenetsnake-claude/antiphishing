@@ -342,6 +342,54 @@ describe('Antiphishing API (e2e)', () => {
             expect(res.body.analysis.enhanced.phones).toEqual([]);
           });
       });
+
+      it('should detect Belgian local toll-free numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Call our helpline at 0800 33 800',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.phones.length > 0) {
+              expect(res.body.analysis.enhanced.phones[0]).toMatch(/\+32800/);
+            }
+          });
+      });
+
+      it('should detect Belgian local landline numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Our office number is 02 123 45 67',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.phones.length > 0) {
+              expect(res.body.analysis.enhanced.phones[0]).toMatch(/\+322/);
+            }
+          });
+      });
+
+      it('should detect Belgian mobile numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'My mobile is 0470 12 34 56',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.phones.length > 0) {
+              expect(res.body.analysis.enhanced.phones[0]).toMatch(/\+3247/);
+            }
+          });
+      });
     });
 
     describe('Validation', () => {
