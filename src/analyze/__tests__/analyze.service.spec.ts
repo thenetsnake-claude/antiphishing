@@ -681,6 +681,14 @@ describe('AnalyzeService', () => {
       expect(result.analysis.enhanced.phones).toContain('+3280033800');
       expect(result.analysis.enhanced.phones).toContain('+32470123456');
     });
+
+    it('should detect phone numbers with slashes as internal separators', async () => {
+      const request = createMockRequest('Test message for structure validation. 32 496 / 123476');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBe(1);
+      expect(result.analysis.enhanced.phones).toContain('+32496123476');
+    });
   });
 
   describe('Public IP detection', () => {

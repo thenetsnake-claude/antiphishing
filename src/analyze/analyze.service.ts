@@ -203,21 +203,30 @@ export class AnalyzeService {
     try {
       const allPhones = new Set<string>();
 
-      // Split content by slash and newline to handle cases where phone numbers
-      // are separated by slashes (e.g., "31.31.20.72 / 31.31.20.73 / 32475123456")
-      // The libphonenumber-js library may stop after the first number when slashes are present
+      // FIRST: Try to find phone numbers in the original content
+      // This handles cases where slashes are part of a single phone number (e.g., "32 496 / 123476")
+      const phoneNumbers = findPhoneNumbersInText(content, 'BE');
+      if (phoneNumbers && phoneNumbers.length > 0) {
+        phoneNumbers.forEach((item) => {
+          try {
+            const phoneNumber: PhoneNumber = item.number;
+            allPhones.add(phoneNumber.number.toString());
+          } catch {
+            // Skip invalid numbers
+          }
+        });
+      }
+
+      // SECOND: Also try splitting by slashes and newlines to find additional numbers
+      // This handles cases where phone numbers are separated by slashes
+      // (e.g., "31.31.20.72 / 31.31.20.73 / 32475123456")
       const segments = content.split(/[\n\/]/);
-
       for (const segment of segments) {
-        // Find all phone numbers in each segment with Belgium as default country
-        const phoneNumbers = findPhoneNumbersInText(segment.trim(), 'BE');
-
-        if (phoneNumbers && phoneNumbers.length > 0) {
-          // Extract and format phone numbers in international format
-          phoneNumbers.forEach((item) => {
+        const segmentPhones = findPhoneNumbersInText(segment.trim(), 'BE');
+        if (segmentPhones && segmentPhones.length > 0) {
+          segmentPhones.forEach((item) => {
             try {
               const phoneNumber: PhoneNumber = item.number;
-              // Add to set in international format (E.164) as string
               allPhones.add(phoneNumber.number.toString());
             } catch {
               // Skip invalid numbers
