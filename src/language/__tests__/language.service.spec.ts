@@ -27,7 +27,7 @@ describe('LanguageService', () => {
 
   describe('detect', () => {
     it('should detect English language', () => {
-      (francAll as jest.Mock).mockReturnValue([['eng', 0.05]]);
+      (francAll as jest.Mock).mockReturnValue([['eng', 0.95]]);
       const content = 'This is a test message in English language. Hello world!';
       const result = service.detect(content);
 
@@ -36,7 +36,7 @@ describe('LanguageService', () => {
     });
 
     it('should detect French language', () => {
-      (francAll as jest.Mock).mockReturnValue([['fra', 0.1]]);
+      (francAll as jest.Mock).mockReturnValue([['fra', 0.9]]);
       const content = 'Bonjour, ceci est un message de test en français.';
       const result = service.detect(content);
 
@@ -45,7 +45,7 @@ describe('LanguageService', () => {
     });
 
     it('should detect Dutch language', () => {
-      (francAll as jest.Mock).mockReturnValue([['nld', 0.15]]);
+      (francAll as jest.Mock).mockReturnValue([['nld', 0.85]]);
       const content = 'Hallo, dit is een testbericht in het Nederlands.';
       const result = service.detect(content);
 
@@ -54,7 +54,7 @@ describe('LanguageService', () => {
     });
 
     it('should detect Polish language', () => {
-      (francAll as jest.Mock).mockReturnValue([['pol', 0.12]]);
+      (francAll as jest.Mock).mockReturnValue([['pol', 0.88]]);
       const content = 'Witaj, to jest testowa wiadomość w języku polskim.';
       const result = service.detect(content);
 
@@ -63,7 +63,7 @@ describe('LanguageService', () => {
     });
 
     it('should detect Spanish language', () => {
-      (francAll as jest.Mock).mockReturnValue([['spa', 0.08]]);
+      (francAll as jest.Mock).mockReturnValue([['spa', 0.92]]);
       const content = 'Hola, este es un mensaje de prueba en español.';
       const result = service.detect(content);
 
@@ -86,7 +86,7 @@ describe('LanguageService', () => {
     });
 
     it('should handle very short content', () => {
-      (francAll as jest.Mock).mockReturnValue([['eng', 0.2]]);
+      (francAll as jest.Mock).mockReturnValue([['eng', 0.8]]);
       const result = service.detect('Hi');
 
       expect(result.language).toBeDefined();
@@ -94,7 +94,7 @@ describe('LanguageService', () => {
     });
 
     it('should handle content with numbers and special characters', () => {
-      (francAll as jest.Mock).mockReturnValue([['eng', 0.1]]);
+      (francAll as jest.Mock).mockReturnValue([['eng', 0.9]]);
       const content = 'Hello 123 !@# $%^ test message';
       const result = service.detect(content);
 
@@ -103,7 +103,7 @@ describe('LanguageService', () => {
     });
 
     it('should return confidence as number between 0-100', () => {
-      (francAll as jest.Mock).mockReturnValue([['eng', 0.05]]);
+      (francAll as jest.Mock).mockReturnValue([['eng', 0.95]]);
       const content = 'This is a test message';
       const result = service.detect(content);
 
@@ -116,8 +116,8 @@ describe('LanguageService', () => {
       // Simulate franc returning Danish with very low confidence
       // but English is in the top results with similar confidence
       (francAll as jest.Mock).mockReturnValue([
-        ['dan', 1.0], // Danish with 0% confidence
-        ['eng', 0.9746], // English with 3% confidence
+        ['dan', 0.03], // Danish with 3% confidence (low)
+        ['eng', 0.025], // English with 2.5% confidence (also low)
       ]);
       const content = 'Test message for structure validation. 32 496 / 123476';
       const result = service.detect(content);
@@ -129,8 +129,8 @@ describe('LanguageService', () => {
 
     it('should not override when non-English language has high confidence', () => {
       (francAll as jest.Mock).mockReturnValue([
-        ['fra', 0.1], // French with ~90% confidence
-        ['eng', 0.8], // English with ~20% confidence
+        ['fra', 0.9], // French with 90% confidence
+        ['eng', 0.2], // English with 20% confidence
       ]);
       const content = 'Bonjour, ceci est un message en français.';
       const result = service.detect(content);
@@ -168,8 +168,8 @@ describe('LanguageService', () => {
 
     it('should detect French using word analysis for short texts', () => {
       (francAll as jest.Mock).mockReturnValue([
-        ['ita', 1.0], // Italian with 0% confidence
-        ['fra', 0.95], // French with 5% confidence
+        ['ita', 0.1], // Italian with 10% confidence (low, triggers word analysis)
+        ['fra', 0.08], // French with 8% confidence
       ]);
       const content = 'Message pour test de validation';
       const result = service.detect(content);
@@ -180,8 +180,8 @@ describe('LanguageService', () => {
 
     it('should detect Dutch using word analysis for short texts', () => {
       (francAll as jest.Mock).mockReturnValue([
-        ['deu', 1.0], // German with 0% confidence
-        ['nld', 0.95], // Dutch with 5% confidence
+        ['deu', 0.1], // German with 10% confidence (low, triggers word analysis)
+        ['nld', 0.08], // Dutch with 8% confidence
       ]);
       const content = 'Dit is een test bericht';
       const result = service.detect(content);
@@ -192,8 +192,8 @@ describe('LanguageService', () => {
 
     it('should detect German using word analysis for short texts', () => {
       (francAll as jest.Mock).mockReturnValue([
-        ['nld', 1.0], // Dutch with 0% confidence
-        ['deu', 0.95], // German with 5% confidence
+        ['nld', 0.1], // Dutch with 10% confidence (low, triggers word analysis)
+        ['deu', 0.08], // German with 8% confidence
       ]);
       const content = 'Das ist eine Test Nachricht';
       const result = service.detect(content);
@@ -204,8 +204,8 @@ describe('LanguageService', () => {
 
     it('should detect Spanish using word analysis for short texts', () => {
       (francAll as jest.Mock).mockReturnValue([
-        ['por', 1.0], // Portuguese with 0% confidence
-        ['spa', 0.95], // Spanish with 5% confidence
+        ['por', 0.1], // Portuguese with 10% confidence (low, triggers word analysis)
+        ['spa', 0.08], // Spanish with 8% confidence
       ]);
       const content = 'Este es un mensaje de test';
       const result = service.detect(content);
@@ -216,8 +216,8 @@ describe('LanguageService', () => {
 
     it('should detect Italian using word analysis for short texts', () => {
       (francAll as jest.Mock).mockReturnValue([
-        ['spa', 1.0], // Spanish with 0% confidence
-        ['ita', 0.95], // Italian with 5% confidence
+        ['spa', 0.1], // Spanish with 10% confidence (low, triggers word analysis)
+        ['ita', 0.08], // Italian with 8% confidence
       ]);
       const content = 'Questo è un messaggio di test';
       const result = service.detect(content);
@@ -228,8 +228,8 @@ describe('LanguageService', () => {
 
     it('should detect Portuguese using word analysis for short texts', () => {
       (francAll as jest.Mock).mockReturnValue([
-        ['spa', 1.0], // Spanish with 0% confidence
-        ['por', 0.95], // Portuguese with 5% confidence
+        ['spa', 0.1], // Spanish with 10% confidence (low, triggers word analysis)
+        ['por', 0.08], // Portuguese with 8% confidence
       ]);
       const content = 'Esta é uma mensagem de teste';
       const result = service.detect(content);
@@ -240,8 +240,8 @@ describe('LanguageService', () => {
 
     it('should detect Polish using word analysis for short texts', () => {
       (francAll as jest.Mock).mockReturnValue([
-        ['ces', 1.0], // Czech with 0% confidence (not supported)
-        ['pol', 0.95], // Polish with 5% confidence
+        ['ces', 0.1], // Czech with 10% confidence (not supported, low)
+        ['pol', 0.08], // Polish with 8% confidence
       ]);
       const content = 'To jest testowa wiadomość';
       const result = service.detect(content);

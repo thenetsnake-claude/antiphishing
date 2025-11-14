@@ -743,11 +743,11 @@ export class LanguageService {
 
       const [detectedLang, score] = results[0];
 
-      // Convert franc's score (distance metric) to confidence percentage
-      // franc returns lower scores for better matches (distance from language model)
-      // Typical ranges: 0-0.5 = excellent, 0.5-1.0 = good, > 1.0 = poor
+      // Convert franc's score to confidence percentage
+      // franc returns higher scores for better matches (confidence value 0-1)
+      // Typical ranges: 1.0 = perfect, 0.8-1.0 = excellent, 0.6-0.8 = good, < 0.6 = poor
       // We convert to 0-100 percentage (higher is better)
-      const rawConfidence = (1 - score) * 100;
+      const rawConfidence = score * 100;
       let confidence = Math.max(0, Math.min(100, Math.round(rawConfidence)));
       let finalLang = detectedLang;
 
@@ -801,7 +801,7 @@ export class LanguageService {
 
         // If we have significant words for this language (>30%)
         if (wordRatio > 0.3) {
-          const langConfidence = Math.max(0, Math.min(100, Math.round((1 - score) * 100)));
+          const langConfidence = Math.max(0, Math.min(100, Math.round(score * 100)));
 
           // Keep track of the best match
           if (!bestMatch || wordRatio > bestMatch.wordRatio) {
