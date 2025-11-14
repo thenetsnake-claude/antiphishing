@@ -139,5 +139,115 @@ describe('LanguageService', () => {
       expect(result.language).toBe('fra');
       expect(result.confidence).toBeGreaterThan(80);
     });
+
+    it('should filter out unsupported languages', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['dan', 0.9], // Danish (not supported)
+        ['ekk', 0.95], // Estonian (not supported)
+        ['eng', 0.97], // English (supported)
+      ]);
+      const content = 'Test message';
+      const result = service.detect(content);
+
+      // Should skip Danish and Estonian, return English
+      expect(result.language).toBe('eng');
+    });
+
+    it('should return unknown when no supported languages detected', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['dan', 0.9], // Danish (not supported)
+        ['ekk', 0.95], // Estonian (not supported)
+        ['sco', 0.97], // Scots (not supported)
+      ]);
+      const content = 'Test message';
+      const result = service.detect(content);
+
+      expect(result.language).toBe('unknown');
+      expect(result.confidence).toBe(0);
+    });
+
+    it('should detect French using word analysis for short texts', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['ita', 1.0], // Italian with 0% confidence
+        ['fra', 0.95], // French with 5% confidence
+      ]);
+      const content = 'Message pour test de validation';
+      const result = service.detect(content);
+
+      // Should detect French due to French words
+      expect(result.language).toBe('fra');
+    });
+
+    it('should detect Dutch using word analysis for short texts', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['deu', 1.0], // German with 0% confidence
+        ['nld', 0.95], // Dutch with 5% confidence
+      ]);
+      const content = 'Dit is een test bericht';
+      const result = service.detect(content);
+
+      // Should detect Dutch due to Dutch words
+      expect(result.language).toBe('nld');
+    });
+
+    it('should detect German using word analysis for short texts', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['nld', 1.0], // Dutch with 0% confidence
+        ['deu', 0.95], // German with 5% confidence
+      ]);
+      const content = 'Das ist eine Test Nachricht';
+      const result = service.detect(content);
+
+      // Should detect German due to German words
+      expect(result.language).toBe('deu');
+    });
+
+    it('should detect Spanish using word analysis for short texts', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['por', 1.0], // Portuguese with 0% confidence
+        ['spa', 0.95], // Spanish with 5% confidence
+      ]);
+      const content = 'Este es un mensaje de test';
+      const result = service.detect(content);
+
+      // Should detect Spanish due to Spanish words
+      expect(result.language).toBe('spa');
+    });
+
+    it('should detect Italian using word analysis for short texts', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['spa', 1.0], // Spanish with 0% confidence
+        ['ita', 0.95], // Italian with 5% confidence
+      ]);
+      const content = 'Questo è un messaggio di test';
+      const result = service.detect(content);
+
+      // Should detect Italian due to Italian words
+      expect(result.language).toBe('ita');
+    });
+
+    it('should detect Portuguese using word analysis for short texts', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['spa', 1.0], // Spanish with 0% confidence
+        ['por', 0.95], // Portuguese with 5% confidence
+      ]);
+      const content = 'Esta é uma mensagem de teste';
+      const result = service.detect(content);
+
+      // Should detect Portuguese due to Portuguese words
+      expect(result.language).toBe('por');
+    });
+
+    it('should detect Polish using word analysis for short texts', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['ces', 1.0], // Czech with 0% confidence (not supported)
+        ['pol', 0.95], // Polish with 5% confidence
+      ]);
+      const content = 'To jest testowa wiadomość';
+      const result = service.detect(content);
+
+      // Should detect Polish due to Polish words
+      expect(result.language).toBe('pol');
+    });
   });
 });
