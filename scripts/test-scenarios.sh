@@ -51,6 +51,11 @@ run_test() {
     ((TESTS_RUN++))
     print_test "Test $TESTS_RUN: $test_name"
 
+    # Display the request
+    echo -e "${BOLD}Request:${NC}"
+    echo "$request_data" | jq '.' 2>/dev/null || echo "$request_data"
+    echo ""
+
     response=$(curl -s -w "\n%{http_code}" -X POST \
         -H "Content-Type: application/json" \
         -d "$request_data" \
@@ -59,20 +64,23 @@ run_test() {
     http_code=$(echo "$response" | tail -n1)
     body=$(echo "$response" | sed '$d')
 
+    # Display the response
+    echo -e "${BOLD}Response (HTTP $http_code):${NC}"
+    echo "$body" | jq '.' 2>/dev/null || echo "$body"
+    echo ""
+
     if [ "$http_code" -eq "$expected_status" ]; then
         if [ -n "$check_response" ]; then
             if echo "$body" | grep -q "$check_response"; then
                 print_success "Status: $http_code (expected), Response contains: $check_response"
             else
                 print_failure "Status: $http_code (expected), but response doesn't contain: $check_response"
-                echo "Response: $body"
             fi
         else
             print_success "Status: $http_code (expected)"
         fi
     else
         print_failure "Status: $http_code (expected: $expected_status)"
-        echo "Response: $body"
     fi
 }
 
