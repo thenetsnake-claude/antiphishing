@@ -201,29 +201,42 @@ export class AnalyzeService {
    */
   private extractPhones(content: string): string[] {
     try {
-      // Find all phone numbers in text with Belgium as default country
-      // This allows detection of local Belgian numbers like "0800 33 800"
+      const allPhones = new Set<string>();
+
+      // FIRST: Try to find phone numbers in the original content
+      // This handles cases where slashes are part of a single phone number (e.g., "32 496 / 123476")
       const phoneNumbers = findPhoneNumbersInText(content, 'BE');
-
-      if (!phoneNumbers || phoneNumbers.length === 0) {
-        return [];
-      }
-
-      // Extract and format phone numbers in international format
-      const phones: string[] = phoneNumbers
-        .map((item) => {
+      if (phoneNumbers && phoneNumbers.length > 0) {
+        phoneNumbers.forEach((item) => {
           try {
             const phoneNumber: PhoneNumber = item.number;
-            // Return in international format (E.164) as string
-            return phoneNumber.number.toString();
+            allPhones.add(phoneNumber.number.toString());
           } catch {
-            return null;
+            // Skip invalid numbers
           }
-        })
-        .filter((phone): phone is string => phone !== null);
+        });
+      }
 
-      // Remove duplicates and return
-      return [...new Set(phones)];
+      // SECOND: Also try splitting by slashes and newlines to find additional numbers
+      // This handles cases where phone numbers are separated by slashes
+      // (e.g., "31.31.20.72 / 31.31.20.73 / 32475123456")
+      const segments = content.split(/[\n\/]/);
+      for (const segment of segments) {
+        const segmentPhones = findPhoneNumbersInText(segment.trim(), 'BE');
+        if (segmentPhones && segmentPhones.length > 0) {
+          segmentPhones.forEach((item) => {
+            try {
+              const phoneNumber: PhoneNumber = item.number;
+              allPhones.add(phoneNumber.number.toString());
+            } catch {
+              // Skip invalid numbers
+            }
+          });
+        }
+      }
+
+      // Return unique phone numbers as array
+      return [...allPhones];
     } catch {
       // If phone number extraction fails, return empty array
       return [];
