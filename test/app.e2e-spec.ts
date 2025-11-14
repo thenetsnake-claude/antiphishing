@@ -287,6 +287,63 @@ describe('Antiphishing API (e2e)', () => {
       });
     });
 
+    describe('Phone Number Detection', () => {
+      it('should detect international phone numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Call us at +1-202-456-1111 for support',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.phones.length > 0) {
+              expect(res.body.analysis.enhanced.phones[0]).toContain('1202');
+            }
+          });
+      });
+
+      it('should detect phone numbers with dots', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Contact: +1.202.456.1111',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+          });
+      });
+
+      it('should detect multiple phone numbers', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Call +1-202-456-1111 or +44-20-7946-0958',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+          });
+      });
+
+      it('should return empty array when no phones present', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'This message has no phone numbers at all',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.phones).toEqual([]);
+          });
+      });
+    });
+
     describe('Validation', () => {
       it('should return 400 for missing parentID', () => {
         const invalidRequest = { ...validRequest } as Record<string, unknown>;

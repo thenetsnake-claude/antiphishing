@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import LinkifyIt = require('linkify-it');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import tlds = require('tlds');
+import { findPhoneNumbersInText, PhoneNumber } from 'libphonenumber-js';
 import { CacheService } from '../cache/cache.service';
 import { LanguageService } from '../language/language.service';
 import { AnalyzeRequestDto } from './dto/analyze-request.dto';
@@ -109,7 +110,7 @@ export class AnalyzeService {
       suspicious_tld: '',
       phishing_keywords: [],
       urls: this.extractUrls(content),
-      phones: [],
+      phones: this.extractPhones(content),
     };
   }
 
@@ -139,6 +140,40 @@ export class AnalyzeService {
 
     // Remove duplicates and return
     return [...new Set(urls)];
+  }
+
+  /**
+   * Extract phone numbers from content using libphonenumber-js
+   * Handles various formats: international, local, with separators (. / ( ) -)
+   */
+  private extractPhones(content: string): string[] {
+    try {
+      // Find all phone numbers in text (without country hint for broader detection)
+      const phoneNumbers = findPhoneNumbersInText(content);
+
+      if (!phoneNumbers || phoneNumbers.length === 0) {
+        return [];
+      }
+
+      // Extract and format phone numbers in international format
+      const phones: string[] = phoneNumbers
+        .map((item) => {
+          try {
+            const phoneNumber: PhoneNumber = item.number;
+            // Return in international format (E.164) as string
+            return phoneNumber.number.toString();
+          } catch {
+            return null;
+          }
+        })
+        .filter((phone): phone is string => phone !== null);
+
+      // Remove duplicates and return
+      return [...new Set(phones)];
+    } catch {
+      // If phone number extraction fails, return empty array
+      return [];
+    }
   }
 
   /**

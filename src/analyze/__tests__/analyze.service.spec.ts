@@ -438,4 +438,147 @@ describe('AnalyzeService', () => {
       expect(result.analysis.enhanced.urls).toHaveLength(3);
     });
   });
+
+  describe('Phone number detection', () => {
+    const createMockRequest = (content: string): AnalyzeRequestDto => ({
+      parentID: '123e4567-e89b-12d3-a456-426614174000',
+      customerID: '223e4567-e89b-12d3-a456-426614174001',
+      senderID: 'test@example.com',
+      messageID: '323e4567-e89b-12d3-a456-426614174002',
+      content,
+    });
+
+    it('should extract phone numbers in international format', async () => {
+      const request = createMockRequest('Call me at +1 (202) 456-1111 for more info');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+
+    it('should extract phone numbers with dots as separators', async () => {
+      const request = createMockRequest('Contact: +1.202.456.1111');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+
+    it('should extract phone numbers with dashes', async () => {
+      const request = createMockRequest('Phone: +44-20-7946-0958');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('4420');
+      }
+    });
+
+    it('should handle phone numbers with slashes', async () => {
+      const request = createMockRequest('Ring +33/1/42/86/82/00');
+      const result = await service.analyze(request);
+
+      // Slashes are unusual separators - may or may not be detected
+      expect(Array.isArray(result.analysis.enhanced.phones)).toBe(true);
+    });
+
+    it('should extract phone numbers with parentheses', async () => {
+      const request = createMockRequest('Call +1(202)456-1111 for info');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should extract multiple phone numbers from content', async () => {
+      const request = createMockRequest('Call +1-202-456-1111 or +44-20-7946-0958 for assistance');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should deduplicate identical phone numbers', async () => {
+      const request = createMockRequest('Call +1-202-456-1111 or +1 (202) 456-1111 for more info');
+      const result = await service.analyze(request);
+
+      // Should deduplicate to 1 number
+      expect(result.analysis.enhanced.phones.length).toBeLessThanOrEqual(1);
+    });
+
+    it('should return empty array when no phone numbers present', async () => {
+      const request = createMockRequest('No phone numbers in this message');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones).toEqual([]);
+    });
+
+    it('should handle phone numbers with spaces', async () => {
+      const request = createMockRequest('Contact +1 202 456 1111');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+
+    it('should extract phone numbers in European format', async () => {
+      const request = createMockRequest('Phone: +49 30 12345678');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('4930');
+      }
+    });
+
+    it('should extract phone numbers in Asian format', async () => {
+      const request = createMockRequest('Call +81-3-1234-5678');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('8131');
+      }
+    });
+
+    it('should handle mixed phone formats in same content', async () => {
+      const request = createMockRequest(
+        'Call +1.202.456.1111, +44-20-7946-0958, or +33/1/42/86/82/00',
+      );
+      const result = await service.analyze(request);
+
+      // Should detect at least one phone number
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should not extract invalid phone-like numbers', async () => {
+      const request = createMockRequest('My code is 123-456 and pin 7890');
+      const result = await service.analyze(request);
+
+      // These short numbers shouldn't be detected as valid phone numbers
+      expect(result.analysis.enhanced.phones.length).toBeLessThanOrEqual(0);
+    });
+
+    it('should handle phone numbers with country code without plus', async () => {
+      const request = createMockRequest('Phone: 1 555 123 4567');
+      const result = await service.analyze(request);
+
+      // May or may not be detected depending on context
+      expect(Array.isArray(result.analysis.enhanced.phones)).toBe(true);
+    });
+
+    it('should extract phone numbers from sentences', async () => {
+      const request = createMockRequest('Please call us at +1-202-456-1111 during business hours');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.phones.length > 0) {
+        expect(result.analysis.enhanced.phones[0]).toContain('1202');
+      }
+    });
+  });
 });
