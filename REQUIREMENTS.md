@@ -8,6 +8,7 @@ Build a NestJS-based content analysis API that detects language from incoming me
 - **Framework**: NestJS
 - **Node.js Version**: 22
 - **Language Detection**: franc library
+- **URL Detection**: linkify-it library with tlds package
 - **Cache**: Redis (with Sentinel support for production)
 - **Test Coverage**: Minimum 75%
 
@@ -115,6 +116,66 @@ Local Redis using Docker Compose (no sentinels, no TLS)
 - Include confidence percentage in `lang_certainity` field
 - Never fail the request due to language detection issues
 
+## URL Detection
+
+### Overview
+The API automatically extracts and normalizes URLs from message content and returns them in the `analysis.enhanced.urls` array.
+
+### Library
+- Use `linkify-it` library (v5.0.0) for URL detection
+- Use `tlds` library for comprehensive TLD support
+- Supports fuzzy matching for bare domains without protocols
+
+### Supported URL Formats
+1. **URLs with protocols**
+   - `http://example.com`
+   - `https://secure.example.com`
+
+2. **URLs starting with www.**
+   - `www.example.com` (automatically prefixed with `http://`)
+
+3. **Bare domains**
+   - `example.com` (automatically prefixed with `http://`)
+   - `subdomain.example.org`
+   - Supports ALL official TLDs (1500+)
+
+4. **URLs with paths and parameters**
+   - `https://example.com/path/to/page`
+   - `https://example.com/page?param=value`
+   - `https://example.com/page#anchor`
+
+### TLD Support
+- Supports **ALL official TLDs** (1500+)
+- Includes generic TLDs: .com, .org, .net, .edu, .gov, .mil, .int
+- Includes country-code TLDs: .uk, .de, .fr, .jp, .cn, .au, .br, etc.
+- Includes new gTLDs: .io, .dev, .app, .tech, .cloud, .online, .shop, .xyz, etc.
+- Includes special-use TLDs: .museum, .aero, .travel, .coop, .jobs, etc.
+- Includes multi-level TLDs: .co.uk, .com.au, .co.za, .com.br, etc.
+- TLD database automatically updated with `tlds` package
+
+### Email Address Filtering
+- **Does NOT detect** email addresses as URLs
+- Email domains are specifically excluded (e.g., `user@example.com`)
+- Only standalone domain names are detected as URLs
+
+### URL Normalization
+- Trailing punctuation automatically removed (periods, commas, semicolons, etc.)
+- Bare domains prefixed with `http://`
+- URLs starting with `www.` prefixed with `http://`
+- Duplicate URLs automatically deduplicated
+- Returns empty array `[]` when no URLs found
+
+### Technical Implementation
+- TypeScript `import = require()` syntax used for module compatibility
+- Works with both `npm run build` and `npm run start:dev` (watch mode)
+- ESLint exceptions added for require-style imports
+- Type-safe with LinkifyIt.Match interface
+
+### Failure Handling
+- If URL detection fails: return empty array `[]`
+- Never fail the request due to URL detection issues
+- Gracefully handle malformed content
+
 ## Health Checks
 
 ### Required Endpoints
@@ -164,6 +225,7 @@ Health checks should verify:
 - Integration tests for API endpoints
 - Tests for Redis caching (with mocked Redis)
 - Tests for language detection
+- Tests for URL detection
 - Tests for validation rules
 
 ### Test Scenarios (cURL)
@@ -178,6 +240,10 @@ Create a script with test scenarios for:
 - Invalid request (content too long)
 - Invalid request (invalid GUID format)
 - Cache hit scenario (same content twice)
+- URL detection with protocol (http://, https://)
+- URL detection with www prefix
+- URL detection with bare domains
+- URL detection should not detect emails
 
 ## Validation Rules
 
@@ -317,15 +383,28 @@ antiphishing-api/
 ## Clarifications Provided
 
 1. **Language Detection Library**: franc
-2. **Cache Key Strategy**: Only content field
-3. **Language Detection Failure**: Return "unknown" with confidence in lang_certainity
-4. **Error Response Format**: Standard NestJS format
-5. **Node.js Version**: 22
-6. **Redis Env Vars**: REDIS_SENTINEL_HOSTS, REDIS_PASSWORD, REDIS_USERNAME, REDIS_TLS_ENABLED, REDIS_MASTER_NAME
-7. **Additional Endpoints**: health, readiness, liveness
-8. **Logging**: Log all except content, JSON to file (daily rotation) + console for dev
-9. **Project Name**: antiphishing-api
-10. **Status Codes**: 200 OK, 400 Bad Request, continue without cache if Redis down
+2. **URL Detection Library**: linkify-it with tlds package for universal TLD support
+3. **Cache Key Strategy**: Only content field
+4. **Language Detection Failure**: Return "unknown" with confidence in lang_certainity
+5. **URL Detection Failure**: Return empty array []
+6. **Error Response Format**: Standard NestJS format
+7. **Node.js Version**: 22
+8. **Redis Env Vars**: REDIS_SENTINEL_HOSTS, REDIS_PASSWORD, REDIS_USERNAME, REDIS_TLS_ENABLED, REDIS_MASTER_NAME
+9. **Additional Endpoints**: health, readiness, liveness
+10. **Logging**: Log all except content, JSON to file (daily rotation) + console for dev
+11. **Project Name**: antiphishing-api
+12. **Status Codes**: 200 OK, 400 Bad Request, continue without cache if Redis down
+
+## Implemented Features
+
+### URL Detection (Added)
+- Automatically extracts URLs from message content
+- Supports http://, https://, www., and bare domains
+- Supports ALL official TLDs (1500+) via linkify-it and tlds libraries
+- Filters out email addresses
+- Normalizes URLs and removes duplicates
+- Returns extracted URLs in `analysis.enhanced.urls` array
+- Comprehensive test coverage: 29 unit tests, 4 E2E tests, 4 cURL scenarios
 
 ## Notes
 - All placeholder values (status: "safe", certainity: 0, etc.) are hardcoded for now
