@@ -201,29 +201,33 @@ export class AnalyzeService {
    */
   private extractPhones(content: string): string[] {
     try {
-      // Find all phone numbers in text with Belgium as default country
-      // This allows detection of local Belgian numbers like "0800 33 800"
-      const phoneNumbers = findPhoneNumbersInText(content, 'BE');
+      const allPhones = new Set<string>();
 
-      if (!phoneNumbers || phoneNumbers.length === 0) {
-        return [];
+      // Split content by slash and newline to handle cases where phone numbers
+      // are separated by slashes (e.g., "31.31.20.72 / 31.31.20.73 / 32475123456")
+      // The libphonenumber-js library may stop after the first number when slashes are present
+      const segments = content.split(/[\n\/]/);
+
+      for (const segment of segments) {
+        // Find all phone numbers in each segment with Belgium as default country
+        const phoneNumbers = findPhoneNumbersInText(segment.trim(), 'BE');
+
+        if (phoneNumbers && phoneNumbers.length > 0) {
+          // Extract and format phone numbers in international format
+          phoneNumbers.forEach((item) => {
+            try {
+              const phoneNumber: PhoneNumber = item.number;
+              // Add to set in international format (E.164) as string
+              allPhones.add(phoneNumber.number.toString());
+            } catch {
+              // Skip invalid numbers
+            }
+          });
+        }
       }
 
-      // Extract and format phone numbers in international format
-      const phones: string[] = phoneNumbers
-        .map((item) => {
-          try {
-            const phoneNumber: PhoneNumber = item.number;
-            // Return in international format (E.164) as string
-            return phoneNumber.number.toString();
-          } catch {
-            return null;
-          }
-        })
-        .filter((phone): phone is string => phone !== null);
-
-      // Remove duplicates and return
-      return [...new Set(phones)];
+      // Return unique phone numbers as array
+      return [...allPhones];
     } catch {
       // If phone number extraction fails, return empty array
       return [];

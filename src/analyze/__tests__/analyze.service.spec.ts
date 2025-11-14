@@ -660,6 +660,27 @@ describe('AnalyzeService', () => {
         expect(hasUS || hasBE).toBe(true);
       }
     });
+
+    it('should extract multiple phone numbers separated by slashes', async () => {
+      const request = createMockRequest(
+        "PLUS D'INFOS EN AGENCE OU AU 31.31.20.72 / 31.31.20.73 / 32475123456",
+      );
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBe(3);
+      expect(result.analysis.enhanced.phones).toContain('+3231312072');
+      expect(result.analysis.enhanced.phones).toContain('+3231312073');
+      expect(result.analysis.enhanced.phones).toContain('+32475123456');
+    });
+
+    it('should handle phone numbers separated by slashes in various formats', async () => {
+      const request = createMockRequest('Contact: 0800 33 800 / 0470 12 34 56');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.phones.length).toBe(2);
+      expect(result.analysis.enhanced.phones).toContain('+3280033800');
+      expect(result.analysis.enhanced.phones).toContain('+32470123456');
+    });
   });
 
   describe('Public IP detection', () => {
