@@ -9,9 +9,11 @@ Build a NestJS-based content analysis API that detects language from incoming me
 - **Node.js Version**: 22
 - **Language Detection**: franc library
 - **URL Detection**: linkify-it library with tlds package
+- **URL Shortener Detection**: link-shorteners library (2,300+ domains)
+- **HTTP Client**: axios library (for redirect following)
 - **Phone Number Detection**: libphonenumber-js library
 - **Public IP Detection**: ipaddr.js library
-- **Cache**: Redis (with Sentinel support for production)
+- **Cache**: Redis (with Sentinel support for production, multi-database support)
 - **Test Coverage**: Minimum 75%
 
 ## API Endpoint Specification
@@ -56,7 +58,8 @@ Build a NestJS-based content analysis API that detects language from incoming me
       "phishing_keywords": [],
       "urls": [],
       "phones": [],
-      "public_ips": []
+      "public_ips": [],
+      "shortener_used": []
     }
   }
 }
@@ -319,6 +322,184 @@ The API automatically filters out **private and special-use IP addresses**:
 - No geolocation or reverse DNS queries
 - No storage or retention of IPs beyond response
 - IP addresses logged in response metadata only
+
+## URL Shortener Detection and Redirect Following
+
+### Overview
+The API automatically detects URL shortener services in message content, follows the redirect chain to reveal the final destination URL, and reports both the final URLs and the shortener domains used.
+
+### Libraries
+- Use `link-shorteners` library for shortener domain detection (2,300+ domains)
+- Use `axios` library for HTTP requests to follow redirects
+- Powered by comprehensive, regularly-updated shortener database
+
+### Detected Shortener Services
+The API detects **2,300+ URL shortener domains**, including:
+
+**Popular shorteners:**
+- `bit.ly` - Bitly shortener
+- `t.co` - Twitter shortener
+- `tinyurl.com` - TinyURL shortener
+- `is.gd` - is.gd shortener
+- `ow.ly` - Hootsuite shortener
+
+**Branded shorteners:**
+- `youtu.be` - YouTube shortener
+- `amzn.to` - Amazon shortener
+- `goo.gl` - Google shortener (legacy)
+
+**Regional and specialized shorteners:**
+- Hundreds of regional shorteners
+- Brand-specific shorteners
+- Custom domain shorteners
+
+### Redirect Following Features
+- **Maximum redirects**: 10 redirects per URL
+- **Timeout**: 2 seconds per redirect request (20 seconds max total)
+- **HTTP method priority**: HEAD first (no body), fallback to GET with Range header
+- **Caching**: 24-hour cache in Redis DB 1 for redirect results
+- **Loop detection**: Prevents infinite redirect loops with visited URL tracking
+- **URL handling**: Supports both relative and absolute redirect URLs
+
+### Output Format
+- **`urls` array**: Contains final destination URLs (not shortened URLs)
+- **`shortener_used` array**: Contains unique shortener domain names
+- Both arrays deduplicated automatically
+
+### Redirect Following Behavior
+
+**When shortener detected:**
+1. Extract hostname from URL
+2. Check against shortener database (2,300+ domains)
+3. If match found, follow redirect chain:
+   - Send HTTP HEAD request with 2s timeout
+   - If HEAD fails, fallback to GET with `Range: bytes=0-0` header
+   - Follow up to 10 redirects
+   - Handle relative paths by constructing absolute URLs
+   - Track visited URLs to prevent loops
+4. Cache result in Redis DB 1 for 24 hours
+5. Return final destination URL in `urls` array
+6. Add shortener domain to `shortener_used` array
+
+**When regular URL (not shortener):**
+1. Extract URL normally
+2. Return in `urls` array without following
+3. Do not add to `shortener_used` array
+
+### Redis Caching for Redirects
+- **Cache location**: Redis DB index 1 (separate from main cache)
+- **Cache key**: `redirect:` + original shortened URL
+- **Cache duration**: 86,400 seconds (24 hours)
+- **Cache value**: `{ finalUrl: string, redirectCount: number }`
+- **Purpose**: Avoid resolving same shortened URL multiple times
+- **Behavior**: Check cache first, follow redirects only on cache miss
+
+### HTTP Request Configuration
+- **User-Agent**: `Mozilla/5.0 (compatible; AntiphishingBot/1.0; +https://antiphishing.example.com)`
+- **Timeout**: 2000ms per request
+- **Max Redirects**: 0 (manual redirect handling)
+- **Methods**: HEAD (preferred), GET with Range header (fallback)
+- **Headers**: Minimal headers to identify as bot
+
+### URL Shortener Detection Features
+- Detects shorteners in all URL formats (http://, https://, www., bare domains)
+- Handles multiple shorteners in single message
+- Deduplicates shortener domains (same shortener listed once)
+- Handles mix of shortened and regular URLs
+- Processes shorteners in parallel when possible
+- Returns empty `shortener_used` array when no shorteners detected
+
+### Examples
+
+**Example 1: Single shortener**
+- Content: `"Check this: https://bit.ly/abc123"`
+- Detected: bit.ly shortener
+- Redirect: bit.ly/abc123 → example.com
+- Result:
+  ```json
+  {
+    "urls": ["https://example.com"],
+    "shortener_used": ["bit.ly"]
+  }
+  ```
+
+**Example 2: Multiple different shorteners**
+- Content: `"Visit https://bit.ly/link1 or https://t.co/link2"`
+- Detected: bit.ly and t.co shorteners
+- Redirects: bit.ly/link1 → example.com, t.co/link2 → test.org
+- Result:
+  ```json
+  {
+    "urls": ["https://example.com", "https://test.org"],
+    "shortener_used": ["bit.ly", "t.co"]
+  }
+  ```
+
+**Example 3: Same shortener multiple times**
+- Content: `"Check https://bit.ly/abc and https://bit.ly/xyz"`
+- Detected: bit.ly shortener (deduplicated)
+- Result:
+  ```json
+  {
+    "urls": ["https://example.com", "https://test.org"],
+    "shortener_used": ["bit.ly"]
+  }
+  ```
+
+**Example 4: Mix of regular and shortened URLs**
+- Content: `"Visit https://example.com and https://bit.ly/abc"`
+- Detected: bit.ly shortener, regular URL not followed
+- Result:
+  ```json
+  {
+    "urls": ["https://example.com", "https://final-dest.com"],
+    "shortener_used": ["bit.ly"]
+  }
+  ```
+
+**Example 5: No shorteners**
+- Content: `"Visit https://example.com for info"`
+- Detected: No shorteners
+- Result:
+  ```json
+  {
+    "urls": ["https://example.com"],
+    "shortener_used": []
+  }
+  ```
+
+### Technical Implementation
+- Service: `RedirectService` with `followRedirects()` method
+- Integration: Called from `AnalyzeService.extractUrls()` when shortener detected
+- TypeScript type definitions for link-shorteners package
+- Async/await for redirect following
+- Error handling with graceful degradation
+
+### Performance Considerations
+- **First request** to shortened URL: 2-4 seconds (depends on redirect chain length)
+- **Cached requests** (within 24h): <50ms (from Redis)
+- **Regular URLs**: Instant (no redirect following)
+- **Multiple shorteners**: Processed sequentially per URL, but URLs extracted in parallel
+- **Impact**: Minimal for non-shortened URLs, one-time cost for shorteners
+
+### Failure Handling
+- If redirect following fails: return original shortened URL
+- If timeout occurs: return original URL
+- If max redirects exceeded: return last URL in chain
+- If loop detected: return last non-looping URL
+- If cache fails: proceed without cache, follow redirects normally
+- Shortener domain still added to `shortener_used` array even on failure
+- Never fail the entire request due to redirect issues
+- Log errors for monitoring
+
+### Security Considerations
+- User-Agent identifies as bot to avoid misleading origin servers
+- No JavaScript execution (only HTTP redirects)
+- Timeout prevents hanging on slow servers
+- Loop detection prevents infinite redirect attacks
+- Does not follow redirects for non-shortener URLs
+- No cookies or session state maintained
+- Read-only operations, no data submission
 
 ## Health Checks
 
