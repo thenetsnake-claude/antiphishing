@@ -17,11 +17,13 @@ describe('DTO Classes', () => {
       dto.phishing_keywords = [];
       dto.urls = [];
       dto.phones = [];
+      dto.public_ips = [];
 
       expect(dto).toBeDefined();
       expect(dto.keyword_density).toBe(0);
       expect(dto.urls).toEqual([]);
       expect(dto.phones).toEqual([]);
+      expect(dto.public_ips).toEqual([]);
     });
 
     it('should allow setting URL values', () => {
@@ -31,6 +33,15 @@ describe('DTO Classes', () => {
       expect(dto.urls).toHaveLength(2);
       expect(dto.urls[0]).toBe('http://example.com');
       expect(dto.urls[1]).toBe('https://test.org');
+    });
+
+    it('should allow setting public IP values', () => {
+      const dto = new EnhancedAnalysisDto();
+      dto.public_ips = ['8.8.8.8', '1.1.1.1'];
+
+      expect(dto.public_ips).toHaveLength(2);
+      expect(dto.public_ips[0]).toBe('8.8.8.8');
+      expect(dto.public_ips[1]).toBe('1.1.1.1');
     });
 
     it('should allow setting all risk values', () => {
@@ -57,6 +68,7 @@ describe('DTO Classes', () => {
       const enhanced = new EnhancedAnalysisDto();
       enhanced.urls = [];
       enhanced.phones = [];
+      enhanced.public_ips = [];
       enhanced.phishing_keywords = [];
 
       const dto = new AnalysisDto();
@@ -103,6 +115,7 @@ describe('DTO Classes', () => {
       const enhanced = new EnhancedAnalysisDto();
       enhanced.urls = ['http://example.com'];
       enhanced.phones = [];
+      enhanced.public_ips = [];
       enhanced.phishing_keywords = [];
       enhanced.keyword_density = 0;
       enhanced.message_length_risk = 0;

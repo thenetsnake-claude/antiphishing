@@ -392,6 +392,80 @@ describe('Antiphishing API (e2e)', () => {
       });
     });
 
+    describe('Public IP Detection', () => {
+      it('should detect public IPv4 addresses', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Server IP is 8.8.8.8 for DNS',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips).toContain('8.8.8.8');
+          });
+      });
+
+      it('should detect multiple public IPs', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'DNS servers: 8.8.8.8 and 1.1.1.1',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips).toContain('8.8.8.8');
+            expect(res.body.analysis.enhanced.public_ips).toContain('1.1.1.1');
+            expect(res.body.analysis.enhanced.public_ips.length).toBe(2);
+          });
+      });
+
+      it('should filter out private IP addresses', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Private: 192.168.1.1, Public: 8.8.8.8',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips).toContain('8.8.8.8');
+            expect(res.body.analysis.enhanced.public_ips).not.toContain('192.168.1.1');
+            expect(res.body.analysis.enhanced.public_ips.length).toBe(1);
+          });
+      });
+
+      it('should return empty array when no IPs present', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'No IP addresses in this message',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips).toEqual([]);
+          });
+      });
+
+      it('should detect IPv6 addresses', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'IPv6 server: 2001:4860:4860::8888',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.public_ips.length).toBeGreaterThanOrEqual(1);
+            if (res.body.analysis.enhanced.public_ips.length > 0) {
+              expect(res.body.analysis.enhanced.public_ips[0]).toMatch(/2001:4860:4860/);
+            }
+          });
+      });
+    });
+
     describe('Validation', () => {
       it('should return 400 for missing parentID', () => {
         const invalidRequest = { ...validRequest } as Record<string, unknown>;

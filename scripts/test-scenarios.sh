@@ -350,6 +350,42 @@ run_test "Phone detection - Belgian mobile" 200 '{
   "messageID": "423e4567-e89b-12d3-a456-426614174012"
 }' '"+3247'
 
+# Test 29: Public IP detection - IPv4 address
+run_test "Public IP detection - IPv4" 200 '{
+  "parentID": "523e4567-e89b-12d3-a456-426614174010",
+  "customerID": "623e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Server IP is 8.8.8.8 for DNS",
+  "messageID": "723e4567-e89b-12d3-a456-426614174012"
+}' '"8.8.8.8"'
+
+# Test 30: Public IP detection - filter private IPs
+run_test "Public IP detection - filter private" 200 '{
+  "parentID": "823e4567-e89b-12d3-a456-426614174010",
+  "customerID": "923e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "Private: 192.168.1.1, Public: 8.8.8.8",
+  "messageID": "a23e4567-e89b-12d3-a456-426614174012"
+}' '"8.8.8.8"'
+
+# Test 31: Public IP detection - multiple IPs
+run_test "Public IP detection - multiple IPs" 200 '{
+  "parentID": "b23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "c23e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "DNS servers: 8.8.8.8 and 1.1.1.1",
+  "messageID": "d23e4567-e89b-12d3-a456-426614174012"
+}' '"public_ips":\['
+
+# Test 32: Public IP detection - no public IPs
+run_test "Public IP detection - no public IPs" 200 '{
+  "parentID": "e23e4567-e89b-12d3-a456-426614174010",
+  "customerID": "f23e4567-e89b-12d3-a456-426614174011",
+  "senderID": "test@example.com",
+  "content": "No IP addresses in this text",
+  "messageID": "023e4567-e89b-12d3-a456-426614174012"
+}' '"public_ips":\[\]'
+
 # Test Health Endpoints
 print_test "Test $((TESTS_RUN + 1)): Health check endpoint"
 ((TESTS_RUN++))

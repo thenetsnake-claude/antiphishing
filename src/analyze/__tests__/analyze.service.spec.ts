@@ -80,6 +80,7 @@ describe('AnalyzeService', () => {
           phishing_keywords: [],
           urls: [],
           phones: [],
+          public_ips: [],
         },
       };
 
@@ -644,6 +645,150 @@ describe('AnalyzeService', () => {
         const hasBE = result.analysis.enhanced.phones.some((p) => p.includes('+32'));
         expect(hasUS || hasBE).toBe(true);
       }
+    });
+  });
+
+  describe('Public IP detection', () => {
+    const createMockRequest = (content: string): AnalyzeRequestDto => ({
+      parentID: '123e4567-e89b-12d3-a456-426614174000',
+      customerID: '223e4567-e89b-12d3-a456-426614174001',
+      senderID: 'test@example.com',
+      messageID: '323e4567-e89b-12d3-a456-426614174002',
+      content,
+    });
+
+    beforeEach(() => {
+      mockCacheService.get.mockResolvedValue(null);
+      mockLanguageService.detect.mockReturnValue({
+        language: 'eng',
+        confidence: 95,
+      });
+    });
+
+    it('should extract public IPv4 addresses', async () => {
+      const request = createMockRequest('Server IP is 8.8.8.8 for DNS');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+    });
+
+    it('should extract multiple public IPv4 addresses', async () => {
+      const request = createMockRequest('DNS servers: 8.8.8.8 and 1.1.1.1');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips).toContain('1.1.1.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(2);
+    });
+
+    it('should filter out private IPv4 addresses', async () => {
+      const request = createMockRequest('Private: 192.168.1.1, Public: 8.8.8.8, Private: 10.0.0.1');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips).not.toContain('192.168.1.1');
+      expect(result.analysis.enhanced.public_ips).not.toContain('10.0.0.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+
+    it('should filter out loopback addresses', async () => {
+      const request = createMockRequest('Localhost: 127.0.0.1, Public: 8.8.8.8');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips).not.toContain('127.0.0.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+
+    it('should filter out link-local addresses', async () => {
+      const request = createMockRequest('Link-local: 169.254.0.1, Public: 1.1.1.1');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('1.1.1.1');
+      expect(result.analysis.enhanced.public_ips).not.toContain('169.254.0.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+
+    it('should extract public IPv6 addresses', async () => {
+      const request = createMockRequest('IPv6 server: 2001:4860:4860::8888');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips.length).toBeGreaterThanOrEqual(1);
+      if (result.analysis.enhanced.public_ips.length > 0) {
+        expect(result.analysis.enhanced.public_ips[0]).toMatch(/2001:4860:4860/);
+      }
+    });
+
+    it('should filter out IPv6 loopback', async () => {
+      const request = createMockRequest('IPv6 loopback: ::1, Public: 2001:4860:4860::8888');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).not.toContain('::1');
+    });
+
+    it('should filter out IPv6 link-local addresses', async () => {
+      const request = createMockRequest('Link-local: fe80::1, Public: 2001:4860:4860::8888');
+      const result = await service.analyze(request);
+
+      const hasLinkLocal = result.analysis.enhanced.public_ips.some((ip) =>
+        ip.toLowerCase().startsWith('fe80'),
+      );
+      expect(hasLinkLocal).toBe(false);
+    });
+
+    it('should deduplicate identical IP addresses', async () => {
+      const request = createMockRequest('Server: 8.8.8.8 and backup: 8.8.8.8');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
+    });
+
+    it('should return empty array when no IPs present', async () => {
+      const request = createMockRequest('No IP addresses in this text');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toEqual([]);
+    });
+
+    it('should return empty array when only private IPs present', async () => {
+      const request = createMockRequest('Private network: 192.168.1.1 and 10.0.0.1');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toEqual([]);
+    });
+
+    it('should handle mixed IPv4 and IPv6 addresses', async () => {
+      const request = createMockRequest('IPv4: 8.8.8.8, IPv6: 2001:4860:4860::8888');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips.length).toBeGreaterThanOrEqual(1);
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+    });
+
+    it('should extract IPs from sentences with text around them', async () => {
+      const request = createMockRequest(
+        'Connect to server at 8.8.8.8 on port 53 for DNS resolution',
+      );
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+    });
+
+    it('should handle IPs in URLs without extracting URL parts', async () => {
+      const request = createMockRequest('Visit http://93.184.216.34/ for more info');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('93.184.216.34');
+    });
+
+    it('should filter out carrier-grade NAT addresses', async () => {
+      const request = createMockRequest('CGN: 100.64.0.1, Public: 8.8.8.8');
+      const result = await service.analyze(request);
+
+      expect(result.analysis.enhanced.public_ips).toContain('8.8.8.8');
+      expect(result.analysis.enhanced.public_ips).not.toContain('100.64.0.1');
+      expect(result.analysis.enhanced.public_ips.length).toBe(1);
     });
   });
 });

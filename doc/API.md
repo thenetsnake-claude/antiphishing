@@ -11,7 +11,7 @@ The Antiphishing API provides content analysis capabilities with language detect
 
 ### POST /analyze
 
-Analyzes message content, detects its language, and extracts URLs.
+Analyzes message content, detects its language, and extracts URLs, phone numbers, and public IP addresses.
 
 #### Request
 
@@ -81,7 +81,8 @@ Content-Type: application/json
       "suspicious_tld": "",
       "phishing_keywords": [],
       "urls": ["http://example.com", "https://secure.site.com"],
-      "phones": ["+12024561111"]
+      "phones": ["+12024561111"],
+      "public_ips": ["8.8.8.8", "1.1.1.1"]
     }
   }
 }
@@ -105,6 +106,7 @@ Content-Type: application/json
 | analysis.enhanced | object | Enhanced analysis metrics |
 | analysis.enhanced.urls | array | Extracted URLs from content (http://, https://, www., bare domains) |
 | analysis.enhanced.phones | array | Extracted phone numbers in E.164 international format |
+| analysis.enhanced.public_ips | array | Extracted public IP addresses (IPv4 and IPv6, private IPs filtered out) |
 
 **Language Codes:**
 - `eng` - English
@@ -188,6 +190,50 @@ Result: `"phones": ["+32800338 00"]`
 
 Content: `"Our office: 02 123 45 67, Mobile: 0470 12 34 56"` (Belgian landline and mobile)
 Result: `"phones": ["+3221234567", "+32470123456"]`
+
+**Public IP Address Detection:**
+
+The API automatically extracts public IP addresses from the message content and includes them in the `analysis.enhanced.public_ips` array. Private and reserved IP addresses are filtered out.
+
+**Detected IP address formats:**
+- **IPv4 addresses**: Standard dotted-decimal notation (e.g., `8.8.8.8`, `1.1.1.1`)
+- **IPv6 addresses**: Standard hexadecimal format (e.g., `2001:4860:4860::8888`)
+
+**Private IP filtering (automatically excluded):**
+- IPv4 private ranges: `10.x.x.x`, `172.16.x.x - 172.31.x.x`, `192.168.x.x`
+- IPv4 loopback: `127.x.x.x`
+- IPv4 link-local: `169.254.x.x`
+- IPv4 carrier-grade NAT: `100.64.x.x - 100.127.x.x`
+- IPv6 loopback: `::1`
+- IPv6 link-local: `fe80::/10`
+- IPv6 unique local: `fc00::/7`
+
+**Public IP detection features:**
+- **Output format**: Standard IP address format (IPv4: dotted-decimal, IPv6: hexadecimal)
+- Powered by `ipaddr.js` library for comprehensive IP parsing and validation
+- Supports both IPv4 and IPv6 addresses
+- Automatically filters out all private, reserved, and special-use ranges
+- Returns only publicly routable IP addresses
+- Automatically deduplicates identical addresses
+- Returns empty array `[]` when no public IPs are present
+- Graceful error handling - never fails the request
+
+**Examples:**
+
+Content: `"Server IP is 8.8.8.8 for DNS"`
+Result: `"public_ips": ["8.8.8.8"]`
+
+Content: `"DNS servers: 8.8.8.8 and 1.1.1.1"`
+Result: `"public_ips": ["8.8.8.8", "1.1.1.1"]`
+
+Content: `"Private: 192.168.1.1, Public: 8.8.8.8"` (private IPs filtered out)
+Result: `"public_ips": ["8.8.8.8"]`
+
+Content: `"IPv6 server: 2001:4860:4860::8888"`
+Result: `"public_ips": ["2001:4860:4860::8888"]`
+
+Content: `"No IP addresses in this text"`
+Result: `"public_ips": []`
 
 **Error Response (400 Bad Request):**
 ```json
