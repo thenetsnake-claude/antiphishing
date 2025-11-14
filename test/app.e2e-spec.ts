@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
 describe('Antiphishing API (e2e)', () => {
@@ -126,9 +126,170 @@ describe('Antiphishing API (e2e)', () => {
       expect(secondResponse.body.analysis.cached).toBe(true);
     });
 
+    describe('URL Detection', () => {
+      it('should detect http URLs in content', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit http://example.com for more information',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toContain('http://example.com');
+            expect(res.body.analysis.enhanced.urls).toHaveLength(1);
+          });
+      });
+
+      it('should detect https URLs in content', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Secure site at https://secure.example.com',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toContain('https://secure.example.com');
+            expect(res.body.analysis.enhanced.urls).toHaveLength(1);
+          });
+      });
+
+      it('should detect www URLs and add protocol', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Check out www.example.org',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toContain('http://www.example.org');
+            expect(res.body.analysis.enhanced.urls).toHaveLength(1);
+          });
+      });
+
+      it('should detect multiple URLs', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit https://example.com or http://test.org and www.sample.net today',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toHaveLength(3);
+            expect(res.body.analysis.enhanced.urls).toContain('https://example.com');
+            expect(res.body.analysis.enhanced.urls).toContain('http://test.org');
+            expect(res.body.analysis.enhanced.urls).toContain('http://www.sample.net');
+          });
+      });
+
+      it('should handle URLs with paths and parameters', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Click https://example.com/path/to/page?param=value&id=123',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toContain(
+              'https://example.com/path/to/page?param=value&id=123',
+            );
+          });
+      });
+
+      it('should return empty array when no URLs present', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'This is a message without any URLs at all',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toEqual([]);
+          });
+      });
+
+      it('should deduplicate identical URLs', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit https://example.com and also https://example.com for more information',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toHaveLength(1);
+            expect(res.body.analysis.enhanced.urls).toContain('https://example.com');
+          });
+      });
+
+      it('should detect bare domains without protocol', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit example.com for more information',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toContain('http://example.com');
+            expect(res.body.analysis.enhanced.urls).toHaveLength(1);
+          });
+      });
+
+      it('should detect multiple bare domains', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit example.com, test.org, and demo.net today',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toHaveLength(3);
+            expect(res.body.analysis.enhanced.urls).toContain('http://example.com');
+            expect(res.body.analysis.enhanced.urls).toContain('http://test.org');
+            expect(res.body.analysis.enhanced.urls).toContain('http://demo.net');
+          });
+      });
+
+      it('should not detect email addresses as URLs', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Contact us at support@example.com for help',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toEqual([]);
+          });
+      });
+
+      it('should handle mixed protocol and bare domains', () => {
+        return request(app.getHttpServer())
+          .post('/analyze')
+          .send({
+            ...validRequest,
+            content: 'Visit https://secure.com, example.org, and www.test.net',
+          })
+          .expect(200)
+          .expect((res) => {
+            expect(res.body.analysis.enhanced.urls).toHaveLength(3);
+            expect(res.body.analysis.enhanced.urls).toContain('https://secure.com');
+            expect(res.body.analysis.enhanced.urls).toContain('http://example.org');
+            expect(res.body.analysis.enhanced.urls).toContain('http://www.test.net');
+          });
+      });
+    });
+
     describe('Validation', () => {
       it('should return 400 for missing parentID', () => {
-        const invalidRequest = { ...validRequest };
+        const invalidRequest = { ...validRequest } as Record<string, unknown>;
         delete invalidRequest.parentID;
 
         return request(app.getHttpServer())
@@ -157,7 +318,7 @@ describe('Antiphishing API (e2e)', () => {
       });
 
       it('should return 400 for missing customerID', () => {
-        const invalidRequest = { ...validRequest };
+        const invalidRequest = { ...validRequest } as Record<string, unknown>;
         delete invalidRequest.customerID;
 
         return request(app.getHttpServer()).post('/analyze').send(invalidRequest).expect(400);
@@ -174,7 +335,7 @@ describe('Antiphishing API (e2e)', () => {
       });
 
       it('should return 400 for missing senderID', () => {
-        const invalidRequest = { ...validRequest };
+        const invalidRequest = { ...validRequest } as Record<string, unknown>;
         delete invalidRequest.senderID;
 
         return request(app.getHttpServer()).post('/analyze').send(invalidRequest).expect(400);
@@ -191,7 +352,7 @@ describe('Antiphishing API (e2e)', () => {
       });
 
       it('should return 400 for missing content', () => {
-        const invalidRequest = { ...validRequest };
+        const invalidRequest = { ...validRequest } as Record<string, unknown>;
         delete invalidRequest.content;
 
         return request(app.getHttpServer()).post('/analyze').send(invalidRequest).expect(400);
@@ -233,7 +394,7 @@ describe('Antiphishing API (e2e)', () => {
       });
 
       it('should return 400 for missing messageID', () => {
-        const invalidRequest = { ...validRequest };
+        const invalidRequest = { ...validRequest } as Record<string, unknown>;
         delete invalidRequest.messageID;
 
         return request(app.getHttpServer()).post('/analyze').send(invalidRequest).expect(400);
