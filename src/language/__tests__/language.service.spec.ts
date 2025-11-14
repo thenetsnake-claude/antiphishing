@@ -111,5 +111,33 @@ describe('LanguageService', () => {
       expect(result.confidence).toBeLessThanOrEqual(100);
       expect(Number.isInteger(result.confidence)).toBe(true);
     });
+
+    it('should detect English when franc returns wrong language with low confidence', () => {
+      // Simulate franc returning Danish with very low confidence
+      // but English is in the top results with similar confidence
+      (francAll as jest.Mock).mockReturnValue([
+        ['dan', 1.0], // Danish with 0% confidence
+        ['eng', 0.9746], // English with 3% confidence
+      ]);
+      const content = 'Test message for structure validation. 32 496 / 123476';
+      const result = service.detect(content);
+
+      // Should prefer English due to English words detected
+      expect(result.language).toBe('eng');
+      expect(result.confidence).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should not override when non-English language has high confidence', () => {
+      (francAll as jest.Mock).mockReturnValue([
+        ['fra', 0.1], // French with ~90% confidence
+        ['eng', 0.8], // English with ~20% confidence
+      ]);
+      const content = 'Bonjour, ceci est un message en français.';
+      const result = service.detect(content);
+
+      // Should keep French due to high confidence
+      expect(result.language).toBe('fra');
+      expect(result.confidence).toBeGreaterThan(80);
+    });
   });
 });
