@@ -146,27 +146,44 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
   /**
    * Get value from cache
    * @param content - Content to use as cache key
+   * @param db - Optional database index (default: 0)
    * @returns Cached value or null
    */
-  async get<T>(content: string): Promise<T | null> {
+  async get<T>(content: string, db: number = 0): Promise<T | null> {
     if (!this.isConnected) {
       this.logger.warn('Redis not connected, returning null');
       return null;
     }
 
     try {
+      // Select database if different from default
+      if (db !== 0) {
+        await this.redis.select(db);
+      }
+
       const key = generateHash(content);
       const value = await this.redis.get(key);
 
+      // Return to default database
+      if (db !== 0) {
+        await this.redis.select(0);
+      }
+
       if (value) {
-        this.logger.debug(`Cache hit for key: ${key}`);
+        this.logger.debug(`Cache hit for key: ${key} (DB: ${db})`);
         return JSON.parse(value) as T;
       }
 
-      this.logger.debug(`Cache miss for key: ${key}`);
+      this.logger.debug(`Cache miss for key: ${key} (DB: ${db})`);
       return null;
     } catch (error) {
       this.logger.warn(`Cache get error: ${error.message}`, error.stack);
+      // Ensure we return to default database
+      try {
+        if (db !== 0) {
+          await this.redis.select(0);
+        }
+      } catch {}
       return null;
     }
   }
@@ -176,19 +193,36 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
    * @param content - Content to use as cache key
    * @param value - Value to cache
    * @param ttl - Time to live in seconds
+   * @param db - Optional database index (default: 0)
    */
-  async set(content: string, value: unknown, ttl: number): Promise<void> {
+  async set(content: string, value: unknown, ttl: number, db: number = 0): Promise<void> {
     if (!this.isConnected) {
       this.logger.warn('Redis not connected, skipping cache set');
       return;
     }
 
     try {
+      // Select database if different from default
+      if (db !== 0) {
+        await this.redis.select(db);
+      }
+
       const key = generateHash(content);
       await this.redis.setex(key, ttl, JSON.stringify(value));
-      this.logger.debug(`Cached value for key: ${key} with TTL: ${ttl}s`);
+      this.logger.debug(`Cached value for key: ${key} with TTL: ${ttl}s (DB: ${db})`);
+
+      // Return to default database
+      if (db !== 0) {
+        await this.redis.select(0);
+      }
     } catch (error) {
       this.logger.warn(`Cache set error: ${error.message}`, error.stack);
+      // Ensure we return to default database
+      try {
+        if (db !== 0) {
+          await this.redis.select(0);
+        }
+      } catch {}
       // Don't throw - allow operation to continue without cache
     }
   }

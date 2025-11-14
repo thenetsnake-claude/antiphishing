@@ -16,6 +16,7 @@ export class EnhancedAnalysisDto {
   urls: string[];
   phones: string[];
   public_ips: string[];
+  shortener_used: string[];
 }
 
 /**
